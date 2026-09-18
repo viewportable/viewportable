@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  DEFAULT_DEVICE_IDS,
-  getDeviceById,
-  resolveDeviceSelection,
-  type DeviceSpec,
-} from '../shared/device'
+  normalizeBoardDeviceIds,
+  resolveBoardDevices,
+  toggleBoardDevice,
+} from '../core/board'
+import { DEFAULT_DEVICE_IDS } from '../shared/device'
 import type { BrowserState } from '../shared/ipc'
 import { DeviceSidebar } from './components/DeviceSidebar'
 import { Toolbar } from './components/Toolbar'
@@ -56,27 +56,19 @@ export function App() {
   }, [state.activeDeviceIds])
 
   const activeDevices = useMemo(
-    () =>
-      state.activeDeviceIds
-        .map((id) => getDeviceById(id))
-        .filter((device): device is DeviceSpec => device !== undefined),
+    () => resolveBoardDevices(state.activeDeviceIds),
     [state.activeDeviceIds],
   )
 
   function toggleDevice(deviceId: string) {
-    const current = selectionRef.current
-    const isActive = current.includes(deviceId)
+    const result = toggleBoardDevice(selectionRef.current, deviceId)
+    if (!result.changed) return
 
-    if (isActive && current.length === 1) return
+    selectionRef.current = [...result.deviceIds]
+    if (result.added) pendingRevealRef.current = deviceId
 
-    const next = isActive ? current.filter((id) => id !== deviceId) : [...current, deviceId]
-    const resolved = resolveDeviceSelection(next).map((device) => device.id).slice(0, 6)
-
-    selectionRef.current = [...resolved]
-    if (!isActive) pendingRevealRef.current = deviceId
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(resolved))
-    window.viewportable.command({ type: 'set-devices', deviceIds: resolved })
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(result.deviceIds))
+    window.viewportable.command({ type: 'set-devices', deviceIds: result.deviceIds })
   }
 
   return (
@@ -135,9 +127,9 @@ function readSavedDeviceIds(): string[] {
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return [...DEFAULT_DEVICE_IDS]
 
-    return resolveDeviceSelection(parsed.filter((value): value is string => typeof value === 'string'))
-      .map((device) => device.id)
-      .slice(0, 6)
+    return normalizeBoardDeviceIds(
+      parsed.filter((value): value is string => typeof value === 'string'),
+    )
   } catch {
     return [...DEFAULT_DEVICE_IDS]
   }

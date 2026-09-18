@@ -1,7 +1,7 @@
 import { BrowserWindow, WebContentsView, type Rectangle } from 'electron'
+import { planBoardReconcile, resolveBoardDevices } from '../core/board'
 import {
   MOBILE_CHROMIUM_PROFILE,
-  resolveDeviceSelection,
   type BrowserProfile,
   type DeviceSpec,
 } from '../shared/device'
@@ -127,24 +127,23 @@ export class ViewportManager {
   }
 
   async setDevices(deviceIds: readonly string[]): Promise<void> {
-    const devices = resolveDeviceSelection(deviceIds)
-    const nextIds = devices.map((device) => device.id)
-    const nextSet = new Set(nextIds)
+    const plan = planBoardReconcile(this.#viewportOrder, deviceIds)
+    const devices = resolveBoardDevices(plan.deviceIds)
 
-    const idsToRemove = this.#viewportOrder.filter((id) => !nextSet.has(id))
-    for (const id of idsToRemove) this.#removeViewport(id)
+    for (const id of plan.removeIds) this.#removeViewport(id)
 
     const loads: Promise<void>[] = []
+    const addIds = new Set(plan.addIds)
 
     for (const device of devices) {
-      if (this.#viewports.has(device.id)) continue
+      if (!addIds.has(device.id)) continue
 
       const managed = this.#addViewport(device)
       managed.pageReady = false
       loads.push(managed.view.webContents.loadURL(this.#currentUrl))
     }
 
-    this.#viewportOrder = nextIds
+    this.#viewportOrder = plan.deviceIds
     this.#layoutAllViewports()
     this.#emitPrimaryState()
 

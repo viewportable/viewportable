@@ -4,7 +4,6 @@ import {
   DEFAULT_DEVICES,
   DEVICE_CATALOG,
   expectedPhysicalWidthMm,
-  resolveDeviceSelection,
 } from '../../src/shared/device'
 
 describe('device catalog', () => {
@@ -16,20 +15,6 @@ describe('device catalog', () => {
   it('groups phones and tablets', () => {
     expect(DEVICE_CATALOG.some((device) => device.category === 'phone')).toBe(true)
     expect(DEVICE_CATALOG.some((device) => device.category === 'tablet')).toBe(true)
-  })
-
-  it('falls back to the default board for an invalid persisted selection', () => {
-    expect(resolveDeviceSelection(['missing-device']).map((device) => device.id)).toEqual([
-      ...DEFAULT_DEVICE_IDS,
-    ])
-  })
-
-  it('deduplicates a persisted selection while preserving order', () => {
-    expect(
-      resolveDeviceSelection(['pixel-tablet', 'iphone-15-pro', 'pixel-tablet']).map(
-        (device) => device.id,
-      ),
-    ).toEqual(['pixel-tablet', 'iphone-15-pro'])
   })
 
   it('keeps verified physical metadata internally consistent', () => {

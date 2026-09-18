@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict'
 import type { BrowserWindow } from 'electron'
-import {
-  DEFAULT_DEVICE_IDS,
-  DEFAULT_DEVICES,
-  resolveDeviceSelection,
-  type DeviceSpec,
-} from '../shared/device'
+import { resolveBoardDevices } from '../core/board'
+import { DEFAULT_DEVICE_IDS, DEFAULT_DEVICES, type DeviceSpec } from '../shared/device'
 import type { ViewportManager, ViewportRuntimeProfile } from './viewport-manager'
 
 const POLL_INTERVAL_MS = 100
@@ -19,7 +15,7 @@ export async function runElectronSelfTest(
   await waitForShell(window)
 
   const before = await waitForExpectedProfiles(manager, expectedUrlPrefix, DEFAULT_DEVICES)
-  const layout = await waitForLayout(manager, DEFAULT_DEVICES.length)
+  const layout = await waitForReportedLayout(manager, DEFAULT_DEVICES.length)
 
   assert.equal(layout.length, DEFAULT_DEVICES.length)
 
@@ -65,6 +61,15 @@ export async function runElectronSelfTest(
     assert.match(profile.userAgent, /Chrome\/152/, `${profile.id}: unexpected user agent`)
   }
 
+  DEFAULT_DEVICES.forEach((device, index) => {
+    manager.setAvailableBounds(device.id, {
+      x: 260 + index * 520,
+      y: 120,
+      width: 500,
+      height: 650,
+    })
+  })
+
   manager.setScaleMode('proportional')
   await delay(250)
 
@@ -81,7 +86,7 @@ export async function runElectronSelfTest(
   )
 
   const expandedIds = [...DEFAULT_DEVICE_IDS, 'compact-phone']
-  const expandedDevices = resolveDeviceSelection(expandedIds)
+  const expandedDevices = resolveBoardDevices(expandedIds)
   await manager.setDevices(expandedIds)
 
   const expanded = await waitForExpectedProfiles(manager, expectedUrlPrefix, expandedDevices)
@@ -153,7 +158,7 @@ async function waitForShell(window: BrowserWindow): Promise<void> {
   throw new Error('Timed out waiting for the Device Board shell and preload API')
 }
 
-async function waitForLayout(
+async function waitForReportedLayout(
   manager: ViewportManager,
   expectedCount: number,
 ): Promise<ReturnType<ViewportManager['inspectLayout']>> {
@@ -163,24 +168,26 @@ async function waitForLayout(
   while (Date.now() < deadline) {
     lastLayout = manager.inspectLayout()
 
-    const ready =
+    const hasReportedAreas =
       lastLayout.length === expectedCount &&
-      lastLayout.every(
-        (viewport) =>
-          viewport.area !== null &&
-          viewport.area.width > 0 &&
-          viewport.area.height > 0 &&
-          viewport.visible &&
-          viewport.bounds.width > 0 &&
-          viewport.bounds.height > 0,
-      )
+      lastLayout.every((viewport) => viewport.area !== null)
 
-    if (ready) return lastLayout
+    const hasVisibleViewport = lastLayout.some(
+      (viewport) =>
+        viewport.area !== null &&
+        viewport.area.width > 0 &&
+        viewport.area.height > 0 &&
+        viewport.visible &&
+        viewport.bounds.width > 0 &&
+        viewport.bounds.height > 0,
+    )
+
+    if (hasReportedAreas && hasVisibleViewport) return lastLayout
     await delay(POLL_INTERVAL_MS)
   }
 
   throw new Error(
-    `Timed out waiting for native viewport layout. Last layout: ${JSON.stringify(lastLayout)}`,
+    `Timed out waiting for reported viewport layout. Last layout: ${JSON.stringify(lastLayout)}`,
   )
 }
 

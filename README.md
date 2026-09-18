@@ -2,36 +2,40 @@
 
 A responsive development browser built on Electron `WebContentsView`.
 
-This repository currently contains the first vertical slice: one desktop shell, one synchronized URL bar, and two real Chromium-backed viewports with mobile device emulation and Fit scaling.
+Viewportable renders real Chromium-backed viewports side by side and keeps logical device geometry separate from on-screen scaling. The current product includes a persistent Device Board, mobile emulation, Fit and shared Proportional scale modes, navigation synchronization and layered automated tests.
 
-## What V1 proves
+- [Product vision and competitive matrix](docs/rfc/vision.md)
+- [Roadmap](docs/roadmap.md)
 
-- Real pages render through `WebContentsView`, not `iframe` or Electron `<webview>`.
-- Two viewports render the same URL simultaneously.
-- Logical device size is independent from the rendered on-screen size.
-- Fit scaling uses `webContents.enableDeviceEmulation({ scale })`, never page zoom.
-- Device emulation includes logical viewport size, DPR, mobile screen mode, mobile UA and touch/coarse-pointer emulation.
-- Native viewport bounds follow React placeholders through `ResizeObserver` and IPC.
-- Navigation state flows from Electron main process back to the toolbar.
-- `target="_blank"` is contained inside Viewportable instead of spawning a bare Electron window.
+## Current vertical slice
+
+- Dynamic Device Board with Phones and Tablets.
+- Add/remove devices with persisted selection.
+- Real `WebContentsView` instances, not iframes or Electron `<webview>`.
+- Chromium DevTools Protocol device metrics emulation.
+- Logical viewport size, DPR, mobile UA, touch, coarse pointer and hover-none emulation.
+- Fit mode: independent scale per viewport.
+- Proportional mode: one shared scale across visible viewports.
+- Synchronized URL/navigation.
+- Horizontal board with native viewport lifecycle managed by Electron main.
+- Vitest unit tests, React Testing Library component tests, native Electron integration tests and Playwright Electron E2E.
+
+Viewportable does not claim that an iPhone geometry rendered by Chromium reproduces Safari/WebKit.
 
 ## Stack
 
 - Electron 44
 - TypeScript 7
 - React 19
-- Vite 8 + electron-vite 5
-- Zod for IPC validation
-- Vitest for pure deterministic logic
-- Playwright Electron for the final E2E smoke test
+- Vite 7 + electron-vite 5
+- Zod for validated IPC contracts in the main process
+- Vitest
+- React Testing Library
+- Playwright Electron
 
 ## Run on macOS
 
-Requirements:
-
-- macOS 13 or newer for Electron 44
-- Node.js 22.18 or newer
-- npm
+Requirements: macOS 13+, Node.js 22.18+, npm.
 
 ```bash
 git clone https://github.com/viewportable/viewportable.git
@@ -40,81 +44,61 @@ npm install
 npm run dev
 ```
 
-The app opens `https://example.com` in two synchronized viewports:
-
-- iPhone 15 Pro geometry: 393 × 852, DPR 3
-- Pixel Tablet geometry: 800 × 1280, DPR 2
-
-Both are rendered by Chromium. Viewportable does not claim that the iPhone geometry reproduces Safari/WebKit.
-
-You can override the initial URL for deterministic local testing:
+Override the initial URL:
 
 ```bash
 VIEWPORTABLE_DEFAULT_URL=http://127.0.0.1:3000 npm run dev
 ```
 
-## Local checks
-
-Fast deterministic checks:
+## Checks
 
 ```bash
-npm run check:fast
-```
-
-Electron E2E after a build:
-
-```bash
-npm run build:app
+npm test
+npm run test:electron
 npm run test:e2e
 ```
 
-Everything:
+`test:electron` and `test:e2e` build before launching Electron so they do not test a stale `out/` directory.
 
 ```bash
+npm run check:fast
 npm run check
 ```
-
-## CI strategy
-
-The workflow is intentionally ordered by cost:
-
-1. format check
-2. lint
-3. typecheck
-4. unit tests
-5. build
-6. Electron E2E under Xvfb
-
-The E2E job depends on the fast job, so it never starts if a cheap deterministic check fails.
-
-CI also uses branch-scoped concurrency with `cancel-in-progress: true`, so a newer push cancels an obsolete run for the same branch/ref.
-
-While the repository is private, push/PR jobs are skipped to avoid consuming private-runner minutes. The workflow subscribes to GitHub's `public` event, so changing the repository from private to public automatically starts CI for the default branch. Manual `workflow_dispatch` remains available when an intentional private run is needed.
-
-The fast job skips Electron and Playwright browser binary downloads. Only the final E2E job installs the Electron binary.
 
 ## Architecture
 
 ```text
-React shell
-  ├─ Toolbar
-  ├─ URL/navigation state
-  └─ Viewport placeholders
-        │ ResizeObserver
-        ▼
-      IPC
-        ▼
-ViewportManager
-  ├─ Scale resolution (Fit in V1)
-  ├─ iPhone 15 Pro WebContentsView
-  └─ Pixel Tablet WebContentsView
+React renderer ─────┐
+                    ├──> core product logic
+Electron main ──────┘
+
+React renderer ─────> validated protocol <──── Electron main/preload
 ```
 
-Each native viewport keeps its declared logical CSS size while the visible native bounds are scaled to fit the available placeholder.
+Current source boundaries:
 
-## Next milestones
+```text
+src/
+├── core/        # host-agnostic product rules
+├── shared/      # device data and shared contracts
+├── renderer/    # React adapter
+├── main/        # Electron/WebContentsView/CDP adapter
+└── preload/     # narrow IPC bridge
+```
 
-- Proportional scale mode with one shared scale across all visible devices
-- True 1:1 calibration per display
-- Per-display calibration persistence and display-change handling
-- Slice integration and diagnostic overlays injected into an isolated page world
+Electron-specific code should not leak into `core`. React should not own domain rules that another visualization would need to reimplement.
+
+See [docs/rfc/vision.md](docs/rfc/vision.md) for the target package architecture.
+
+## CI strategy
+
+CI is ordered by cost and uses branch-scoped concurrency with `cancel-in-progress: true`:
+
+1. lint
+2. typecheck
+3. unit tests
+4. component tests
+5. build
+6. native Electron integration on macOS
+
+Playwright Electron E2E remains available as a local/manual regression layer while the native Electron integration runner is the required desktop gate.

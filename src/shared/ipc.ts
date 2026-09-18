@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_ACTIVE_DEVICES } from '../core/board'
 import { IPC } from './ipc-channels'
 import { ACTIVE_SCALE_MODES } from './scale'
 
@@ -7,7 +8,7 @@ export { IPC }
 const DeviceIdsSchema = z
   .array(z.string().min(1))
   .min(1)
-  .max(6)
+  .max(MAX_ACTIVE_DEVICES)
   .refine((ids) => new Set(ids).size === ids.length, 'Device ids must be unique')
 
 export const BrowserCommandSchema = z.discriminatedUnion('type', [

@@ -93,28 +93,9 @@ export function getDeviceById(id: string): DeviceSpec | undefined {
   return DEVICE_CATALOG.find((device) => device.id === id)
 }
 
-export function resolveDeviceSelection(ids: readonly string[]): DeviceSpec[] {
-  const seen = new Set<string>()
-  const devices: DeviceSpec[] = []
-
-  for (const id of ids) {
-    if (seen.has(id)) continue
-
-    const device = getDeviceById(id)
-    if (!device) continue
-
-    seen.add(id)
-    devices.push(device)
-  }
-
-  if (devices.length > 0) return devices
-
-  return DEFAULT_DEVICE_IDS.map((id) => getDeviceById(id)).filter(
-    (device): device is DeviceSpec => device !== undefined,
-  )
-}
-
-export const DEFAULT_DEVICES = resolveDeviceSelection(DEFAULT_DEVICE_IDS)
+export const DEFAULT_DEVICES = DEFAULT_DEVICE_IDS.map((id) => getDeviceById(id)).filter(
+  (device): device is DeviceSpec => device !== undefined,
+)
 
 export function expectedPhysicalWidthMm(device: DeviceSpec): number | null {
   if (!device.ppi) return null
