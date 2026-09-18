@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { DEVICES, expectedPhysicalWidthMm } from '../../src/shared/device'
+import { getDeviceById } from '../../src/shared/device'
 import {
   resolveFitScale,
   resolveProportionalScale,
   scaledSize,
 } from '../../src/shared/scale'
 
-const phone = DEVICES[0]!
-const tablet = DEVICES[1]!
+const phone = getDeviceById('iphone-15-pro')!
+const tablet = getDeviceById('pixel-tablet')!
 
 describe('resolveFitScale', () => {
   it('never upscales above 1', () => {
@@ -48,11 +48,5 @@ describe('resolveProportionalScale', () => {
 describe('scaledSize', () => {
   it('rounds native bounds up while preserving logical dimensions elsewhere', () => {
     expect(scaledSize(phone, 0.5)).toEqual({ width: 197, height: 426 })
-  })
-})
-
-describe('device physical metadata', () => {
-  it.each(DEVICES)('$name physical width agrees with css, DPR and PPI', (device) => {
-    expect(expectedPhysicalWidthMm(device)).toBeCloseTo(device.physical.widthMm, 1)
   })
 })

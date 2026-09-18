@@ -1,5 +1,10 @@
 import { BrowserWindow, WebContentsView, type Rectangle } from 'electron'
-import { MOBILE_CHROMIUM_PROFILE, type BrowserProfile, type DeviceSpec } from '../shared/device'
+import {
+  MOBILE_CHROMIUM_PROFILE,
+  resolveDeviceSelection,
+  type BrowserProfile,
+  type DeviceSpec,
+} from '../shared/device'
 import {
   resolveFitScale,
   resolveProportionalScale,
@@ -46,15 +51,18 @@ type StateListener = (state: {
   error: string | null
   scaleMode: ActiveScaleMode
   viewportScales: Record<string, number>
+  activeDeviceIds: string[]
 }) => void
 
 export class ViewportManager {
   readonly #window: BrowserWindow
   readonly #viewports = new Map<string, ManagedViewport>()
-  readonly #primaryId: string
+  readonly #browser: BrowserProfile
   readonly #onState: StateListener
+  #viewportOrder: string[] = []
   #lastError: string | null = null
   #scaleMode: ActiveScaleMode = 'fit'
+  #currentUrl = 'https://example.com'
 
   constructor(
     window: BrowserWindow,
@@ -65,42 +73,16 @@ export class ViewportManager {
     if (devices.length === 0) throw new Error('ViewportManager requires at least one device')
 
     this.#window = window
-    this.#primaryId = devices[0]!.id
+    this.#browser = browser
     this.#onState = onState
 
     traceStartup('viewport-manager:constructor')
+
     for (const device of devices) {
-      traceStartup(`${device.id}:new-view:start`)
-      const view = new WebContentsView({
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-          sandbox: true,
-        },
-      })
-      traceStartup(`${device.id}:new-view:done`)
-
-      const managed: ManagedViewport = {
-        id: device.id,
-        device,
-        browser,
-        view,
-        lastArea: null,
-        resolvedScale: 1,
-        pageReady: false,
-        emulationReady: false,
-      }
-
-      this.#viewports.set(device.id, managed)
-
-      view.setBounds({ x: 0, y: 0, width: 0, height: 0 })
-      view.setVisible(false)
-
-      traceStartup(`${device.id}:add-child:start`)
-      window.contentView.addChildView(view)
-      traceStartup(`${device.id}:add-child:done`)
-      this.#configureViewport(managed)
+      this.#addViewport(device)
     }
+
+    this.#viewportOrder = devices.map((device) => device.id)
   }
 
   async loadInitialUrl(url: string): Promise<void> {
@@ -109,18 +91,20 @@ export class ViewportManager {
 
   async navigate(value: string): Promise<void> {
     const url = normalizeUrl(value)
+    this.#currentUrl = url
     traceStartup(`navigate:start:${url}`)
     this.#lastError = null
 
-    for (const managed of this.#viewports.values()) managed.pageReady = false
+    const viewports = this.#managedViewports()
+    for (const managed of viewports) managed.pageReady = false
 
-    await Promise.allSettled([...this.#viewports.values()].map(({ view }) => view.webContents.loadURL(url)))
+    await Promise.allSettled(viewports.map(({ view }) => view.webContents.loadURL(url)))
     traceStartup(`navigate:done:${url}`)
     this.#emitPrimaryState()
   }
 
   back(): void {
-    for (const { view } of this.#viewports.values()) {
+    for (const { view } of this.#managedViewports()) {
       if (view.webContents.navigationHistory.canGoBack()) {
         view.webContents.navigationHistory.goBack()
       }
@@ -128,7 +112,7 @@ export class ViewportManager {
   }
 
   forward(): void {
-    for (const { view } of this.#viewports.values()) {
+    for (const { view } of this.#managedViewports()) {
       if (view.webContents.navigationHistory.canGoForward()) {
         view.webContents.navigationHistory.goForward()
       }
@@ -136,10 +120,36 @@ export class ViewportManager {
   }
 
   reload(): void {
-    for (const managed of this.#viewports.values()) {
+    for (const managed of this.#managedViewports()) {
       managed.pageReady = false
       managed.view.webContents.reload()
     }
+  }
+
+  async setDevices(deviceIds: readonly string[]): Promise<void> {
+    const devices = resolveDeviceSelection(deviceIds)
+    const nextIds = devices.map((device) => device.id)
+    const nextSet = new Set(nextIds)
+
+    for (const id of [...this.#viewportOrder]) {
+      if (!nextSet.has(id)) this.#removeViewport(id)
+    }
+
+    const loads: Promise<void>[] = []
+
+    for (const device of devices) {
+      if (this.#viewports.has(device.id)) continue
+
+      const managed = this.#addViewport(device)
+      managed.pageReady = false
+      loads.push(managed.view.webContents.loadURL(this.#currentUrl))
+    }
+
+    this.#viewportOrder = nextIds
+    this.#layoutAllViewports()
+    this.#emitPrimaryState()
+
+    await Promise.allSettled(loads)
   }
 
   setScaleMode(mode: ActiveScaleMode): void {
@@ -169,7 +179,7 @@ export class ViewportManager {
     area: Rectangle | null
     bounds: Rectangle
   }> {
-    return [...this.#viewports.values()].map(({ id, view, lastArea }) => ({
+    return this.#managedViewports().map(({ id, view, lastArea }) => ({
       id,
       visible: view.getVisible(),
       area: lastArea,
@@ -179,7 +189,7 @@ export class ViewportManager {
 
   async inspectProfiles(): Promise<ViewportRuntimeProfile[]> {
     return Promise.all(
-      [...this.#viewports.values()].map(async ({ id, view, resolvedScale }) => {
+      this.#managedViewports().map(async ({ id, view, resolvedScale }) => {
         const runtime = (await view.webContents.executeJavaScript(`({
           innerWidth: window.innerWidth,
           innerHeight: window.innerHeight,
@@ -201,28 +211,89 @@ export class ViewportManager {
   }
 
   destroy(): void {
-    for (const { view } of this.#viewports.values()) {
-      try {
-        if (!this.#window.isDestroyed()) {
-          this.#window.contentView.removeChildView(view)
-        }
-      } catch {
-        // Electron may already have destroyed the native View during app shutdown.
-      }
-
-      try {
-        const contents = view.webContents
-        if (!contents.isDestroyed()) contents.close()
-      } catch {
-        // Cleanup is intentionally idempotent during Ctrl-C / app termination.
-      }
+    for (const id of [...this.#viewportOrder]) {
+      this.#removeViewport(id)
     }
 
     this.#viewports.clear()
+    this.#viewportOrder = []
+  }
+
+  #managedViewports(): ManagedViewport[] {
+    return this.#viewportOrder
+      .map((id) => this.#viewports.get(id))
+      .filter((viewport): viewport is ManagedViewport => viewport !== undefined)
+  }
+
+  #primaryViewport(): ManagedViewport | undefined {
+    const id = this.#viewportOrder[0]
+    return id ? this.#viewports.get(id) : undefined
+  }
+
+  #addViewport(device: DeviceSpec): ManagedViewport {
+    traceStartup(`${device.id}:new-view:start`)
+    const view = new WebContentsView({
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+      },
+    })
+    traceStartup(`${device.id}:new-view:done`)
+
+    const managed: ManagedViewport = {
+      id: device.id,
+      device,
+      browser: this.#browser,
+      view,
+      lastArea: null,
+      resolvedScale: 1,
+      pageReady: false,
+      emulationReady: false,
+    }
+
+    this.#viewports.set(device.id, managed)
+    if (!this.#viewportOrder.includes(device.id)) this.#viewportOrder.push(device.id)
+
+    view.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+    view.setVisible(false)
+
+    traceStartup(`${device.id}:add-child:start`)
+    this.#window.contentView.addChildView(view)
+    traceStartup(`${device.id}:add-child:done`)
+
+    this.#configureViewport(managed)
+    return managed
+  }
+
+  #removeViewport(id: string): void {
+    const managed = this.#viewports.get(id)
+    if (!managed) return
+
+    managed.view.setVisible(false)
+
+    try {
+      if (!this.#window.isDestroyed()) {
+        this.#window.contentView.removeChildView(managed.view)
+      }
+    } catch {
+      // Electron may already have destroyed the native View during app shutdown.
+    }
+
+    try {
+      const contents = managed.view.webContents
+      if (!contents.isDestroyed()) contents.close()
+    } catch {
+      // Cleanup is intentionally idempotent during app termination.
+    }
+
+    this.#viewports.delete(id)
+    this.#viewportOrder = this.#viewportOrder.filter((viewportId) => viewportId !== id)
   }
 
   #layoutAllViewports(): void {
-    const candidates = [...this.#viewports.values()]
+    const managedViewports = this.#managedViewports()
+    const candidates = managedViewports
       .filter(({ lastArea }) => lastArea && lastArea.width > 0 && lastArea.height > 0)
       .map(({ device, lastArea }) => ({
         device,
@@ -232,7 +303,7 @@ export class ViewportManager {
     const proportionalScale =
       this.#scaleMode === 'proportional' ? resolveProportionalScale(candidates) : 0
 
-    for (const managed of this.#viewports.values()) {
+    for (const managed of managedViewports) {
       const area = managed.lastArea
 
       if (!area || area.width <= 0 || area.height <= 0) {
@@ -284,7 +355,7 @@ export class ViewportManager {
     })
 
     const emit = () => {
-      if (managed.id === this.#primaryId) this.#emitPrimaryState()
+      if (managed.id === this.#viewportOrder[0]) this.#emitPrimaryState()
     }
 
     contents.on('did-start-loading', () => {
@@ -292,7 +363,12 @@ export class ViewportManager {
       emit()
     })
     contents.on('did-stop-loading', emit)
-    contents.on('did-navigate', emit)
+    contents.on('did-navigate', () => {
+      emit()
+      if (managed.id === this.#viewportOrder[0] && contents.getURL()) {
+        this.#currentUrl = contents.getURL()
+      }
+    })
     contents.on('did-navigate-in-page', emit)
     contents.on('did-finish-load', () => {
       managed.pageReady = true
@@ -305,7 +381,7 @@ export class ViewportManager {
     })
     contents.on('did-fail-load', (_event, errorCode, errorDescription, validatedUrl, isMainFrame) => {
       if (!isMainFrame || errorCode === -3) return
-      if (managed.id === this.#primaryId) {
+      if (managed.id === this.#viewportOrder[0]) {
         this.#lastError = `${errorDescription} (${errorCode}) - ${validatedUrl}`
         this.#emitPrimaryState()
       }
@@ -364,20 +440,24 @@ export class ViewportManager {
   }
 
   #emitPrimaryState(): void {
-    const primary = this.#viewports.get(this.#primaryId)
+    const primary = this.#primaryViewport()
     if (!primary || primary.view.webContents.isDestroyed()) return
 
     const contents = primary.view.webContents
+    const url = contents.getURL()
+    if (url) this.#currentUrl = url
+
     this.#onState({
-      url: contents.getURL(),
+      url,
       canGoBack: contents.navigationHistory.canGoBack(),
       canGoForward: contents.navigationHistory.canGoForward(),
       isLoading: contents.isLoading(),
       error: this.#lastError,
       scaleMode: this.#scaleMode,
       viewportScales: Object.fromEntries(
-        [...this.#viewports.values()].map(({ id, resolvedScale }) => [id, resolvedScale]),
+        this.#managedViewports().map(({ id, resolvedScale }) => [id, resolvedScale]),
       ),
+      activeDeviceIds: [...this.#viewportOrder],
     })
   }
 }

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, type MenuItemConstructorOptions } from 'electron'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEVICES } from '../shared/device'
+import { DEFAULT_DEVICES } from '../shared/device'
 import { BrowserCommandSchema, BrowserStateSchema, IPC, ViewportBoundsSchema } from '../shared/ipc'
 import { runElectronSelfTest } from './self-test'
 import { ViewportManager } from './viewport-manager'
@@ -92,7 +92,7 @@ function createWindow(): BrowserWindow {
   })
 
   traceStartup('viewport-manager:create:start')
-  const manager = new ViewportManager(window, DEVICES, (state) => {
+  const manager = new ViewportManager(window, DEFAULT_DEVICES, (state) => {
     if (!window.isDestroyed()) window.webContents.send(IPC.state, BrowserStateSchema.parse(state))
   })
 
@@ -159,6 +159,9 @@ ipcMain.on(IPC.command, (_event, payload: unknown) => {
       break
     case 'set-scale-mode':
       manager.setScaleMode(command.mode)
+      break
+    case 'set-devices':
+      void manager.setDevices(command.deviceIds)
       break
   }
 })
