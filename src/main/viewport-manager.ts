@@ -131,7 +131,7 @@ export class ViewportManager {
     const nextIds = devices.map((device) => device.id)
     const nextSet = new Set(nextIds)
 
-    for (const id of [...this.#viewportOrder]) {
+    for (const id of this.#viewportOrder) {
       if (!nextSet.has(id)) this.#removeViewport(id)
     }
 
@@ -211,7 +211,7 @@ export class ViewportManager {
   }
 
   destroy(): void {
-    for (const id of [...this.#viewportOrder]) {
+    for (const id of this.#viewportOrder) {
       this.#removeViewport(id)
     }
 

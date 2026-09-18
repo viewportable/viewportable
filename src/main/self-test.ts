@@ -3,7 +3,6 @@ import type { BrowserWindow } from 'electron'
 import {
   DEFAULT_DEVICE_IDS,
   DEFAULT_DEVICES,
-  getDeviceById,
   resolveDeviceSelection,
   type DeviceSpec,
 } from '../shared/device'
