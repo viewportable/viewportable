@@ -44,6 +44,21 @@ export async function runElectronSelfTest(
     assert.match(profile.userAgent, /Chrome\/152/, `${profile.id}: unexpected user agent`)
   }
 
+  manager.setScaleMode('proportional')
+  await delay(250)
+
+  const proportional = await manager.inspectProfiles()
+  const proportionalScales = proportional.map((profile) => profile.resolvedScale)
+  assert.ok(
+    Math.max(...proportionalScales) - Math.min(...proportionalScales) < 0.001,
+    `Proportional mode must use one shared scale: ${JSON.stringify(proportionalScales)}`,
+  )
+  assert.deepEqual(
+    proportional.map((profile) => profile.innerWidth).sort((a, b) => a - b),
+    expectedWidths,
+    'Proportional mode changed logical viewport widths',
+  )
+
   window.setSize(1000, 680)
   await delay(400)
 
@@ -67,7 +82,7 @@ async function waitForShell(window: BrowserWindow): Promise<void> {
       hasApi: typeof window.viewportable === 'object'
     })`)) as { text: string; hasApi: boolean }
 
-    if (shell.text.includes('Two real Chromium viewports') && shell.hasApi) return
+    if (shell.text.includes('Two real Chromium viewports') && shell.text.includes('Proportional') && shell.hasApi) return
     await delay(POLL_INTERVAL_MS)
   }
 

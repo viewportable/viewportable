@@ -277,3 +277,35 @@ h1 {
     grid-template-columns: auto auto minmax(180px, 1fr);
   }
 }
+
+
+.scale-control {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid #2c323b;
+  border-radius: 999px;
+  background: #101419;
+  -webkit-app-region: no-drag;
+}
+
+.scale-option {
+  min-height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  color: #7f8894;
+  background: transparent;
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scale-option:hover {
+  color: #d7dbe1;
+}
+
+.scale-option.active {
+  color: #f2f4f7;
+  background: #242a32;
+}

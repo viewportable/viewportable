@@ -10,6 +10,8 @@ const INITIAL_STATE: BrowserState = {
   canGoForward: false,
   isLoading: true,
   error: null,
+  scaleMode: 'fit',
+  viewportScales: {},
 }
 
 export function App() {
@@ -38,13 +40,19 @@ export function App() {
             <h1>Two real Chromium viewports</h1>
           </div>
           <p className="workspace-note">
-            Logical layout stays fixed while Fit mode changes only the rendered scale.
+            {state.scaleMode === 'fit'
+              ? 'Fit scales each viewport independently to use the available space.'
+              : 'Proportional applies one shared scale so relative device sizes stay truthful.'}
           </p>
         </div>
 
         <div className="viewport-grid">
           {DEVICES.map((device) => (
-            <ViewportCard key={device.id} device={device} />
+            <ViewportCard
+              key={device.id}
+              device={device}
+              scale={state.viewportScales[device.id] ?? 1}
+            />
           ))}
         </div>
       </div>

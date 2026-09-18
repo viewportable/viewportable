@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, type MenuItemConstructorOptions } from 'electron'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DEVICES } from '../shared/device'
@@ -8,6 +8,35 @@ import { ViewportManager } from './viewport-manager'
 
 let mainWindow: BrowserWindow | null = null
 let viewportManager: ViewportManager | null = null
+
+app.setName('Viewportable')
+
+function installApplicationMenu(): void {
+  if (process.platform !== 'darwin') return
+
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: 'Viewportable',
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    { role: 'fileMenu' },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+  ]
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
 
 function traceStartup(message: string): void {
   if (process.env.VIEWPORTABLE_SELF_TEST === '1') {
@@ -128,6 +157,9 @@ ipcMain.on(IPC.command, (_event, payload: unknown) => {
     case 'sync-state':
       manager.emitState()
       break
+    case 'set-scale-mode':
+      manager.setScaleMode(command.mode)
+      break
   }
 })
 
@@ -146,6 +178,7 @@ ipcMain.on(IPC.bounds, (_event, payload: unknown) => {
 
 app.whenReady().then(() => {
   traceStartup('app:ready')
+  installApplicationMenu()
   createWindow()
 
   app.on('activate', () => {

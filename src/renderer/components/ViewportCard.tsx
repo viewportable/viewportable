@@ -1,14 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { DeviceSpec } from '../../shared/device'
-import { resolveFitScale } from '../../shared/scale'
 
 type Props = {
   device: DeviceSpec
+  scale: number
 }
 
-export function ViewportCard({ device }: Props) {
+export function ViewportCard({ device, scale }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(1)
 
   useEffect(() => {
     const element = hostRef.current
@@ -19,8 +18,6 @@ export function ViewportCard({ device }: Props) {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
         const rect = element.getBoundingClientRect()
-        const nextScale = resolveFitScale(device, { width: rect.width, height: rect.height })
-        setScale(nextScale)
         window.viewportable.setViewportBounds({
           viewportId: device.id,
           rect: {

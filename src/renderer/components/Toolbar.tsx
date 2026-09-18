@@ -1,20 +1,12 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import type { BrowserState } from '../../shared/ipc'
 
-const INITIAL_STATE: BrowserState = {
-  url: 'https://example.com',
-  canGoBack: false,
-  canGoForward: false,
-  isLoading: true,
-  error: null,
-}
-
 type Props = {
   state: BrowserState
 }
 
 export function Toolbar({ state }: Props) {
-  const [value, setValue] = useState(state.url || INITIAL_STATE.url)
+  const [value, setValue] = useState(state.url || 'https://example.com')
 
   useEffect(() => {
     if (state.url) setValue(state.url)
@@ -74,7 +66,26 @@ export function Toolbar({ state }: Props) {
       </form>
 
       <div className="toolbar-meta">
-        <span className="mode-pill">Fit</span>
+        <div className="scale-control" aria-label="Viewport scale mode">
+          <button
+            type="button"
+            className={state.scaleMode === 'fit' ? 'scale-option active' : 'scale-option'}
+            aria-pressed={state.scaleMode === 'fit'}
+            onClick={() => window.viewportable.command({ type: 'set-scale-mode', mode: 'fit' })}
+          >
+            Fit
+          </button>
+          <button
+            type="button"
+            className={state.scaleMode === 'proportional' ? 'scale-option active' : 'scale-option'}
+            aria-pressed={state.scaleMode === 'proportional'}
+            onClick={() =>
+              window.viewportable.command({ type: 'set-scale-mode', mode: 'proportional' })
+            }
+          >
+            Proportional
+          </button>
+        </div>
         <span className="engine-pill">Chromium</span>
       </div>
     </header>

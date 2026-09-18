@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { IPC } from './ipc-channels'
+import { ACTIVE_SCALE_MODES } from './scale'
 
 export { IPC }
 
@@ -9,6 +10,7 @@ export const BrowserCommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('forward') }),
   z.object({ type: z.literal('reload') }),
   z.object({ type: z.literal('sync-state') }),
+  z.object({ type: z.literal('set-scale-mode'), mode: z.enum(ACTIVE_SCALE_MODES) }),
 ])
 
 export type BrowserCommand = z.infer<typeof BrowserCommandSchema>
@@ -31,6 +33,8 @@ export const BrowserStateSchema = z.object({
   canGoForward: z.boolean(),
   isLoading: z.boolean(),
   error: z.string().nullable(),
+  scaleMode: z.enum(ACTIVE_SCALE_MODES),
+  viewportScales: z.record(z.string(), z.number().finite().nonnegative()),
 })
 
 export type BrowserState = z.infer<typeof BrowserStateSchema>

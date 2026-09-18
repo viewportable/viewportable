@@ -1,6 +1,11 @@
 import { BrowserWindow, WebContentsView, type Rectangle } from 'electron'
 import { MOBILE_CHROMIUM_PROFILE, type BrowserProfile, type DeviceSpec } from '../shared/device'
-import { resolveFitScale, scaledSize } from '../shared/scale'
+import {
+  resolveFitScale,
+  resolveProportionalScale,
+  scaledSize,
+  type ActiveScaleMode,
+} from '../shared/scale'
 import { normalizeUrl } from '../shared/url'
 
 export type ManagedViewport = {
@@ -39,6 +44,8 @@ type StateListener = (state: {
   canGoForward: boolean
   isLoading: boolean
   error: string | null
+  scaleMode: ActiveScaleMode
+  viewportScales: Record<string, number>
 }) => void
 
 export class ViewportManager {
@@ -47,6 +54,7 @@ export class ViewportManager {
   readonly #primaryId: string
   readonly #onState: StateListener
   #lastError: string | null = null
+  #scaleMode: ActiveScaleMode = 'fit'
 
   constructor(
     window: BrowserWindow,
@@ -85,8 +93,6 @@ export class ViewportManager {
 
       this.#viewports.set(device.id, managed)
 
-      // A native WebContentsView is layered above the BrowserWindow renderer.
-      // Keep it invisible until React reports the exact placeholder bounds.
       view.setBounds({ x: 0, y: 0, width: 0, height: 0 })
       view.setVisible(false)
 
@@ -136,6 +142,14 @@ export class ViewportManager {
     }
   }
 
+  setScaleMode(mode: ActiveScaleMode): void {
+    if (this.#scaleMode === mode) return
+
+    this.#scaleMode = mode
+    this.#layoutAllViewports()
+    this.#emitPrimaryState()
+  }
+
   emitState(): void {
     this.#emitPrimaryState()
   }
@@ -145,26 +159,8 @@ export class ViewportManager {
     if (!managed) return
 
     managed.lastArea = area
-
-    if (area.width <= 0 || area.height <= 0) {
-      managed.view.setVisible(false)
-      return
-    }
-
-    const scale = resolveFitScale(managed.device, area)
-    const size = scaledSize(managed.device, scale)
-    const x = Math.round(area.x + Math.max(0, (area.width - size.width) / 2))
-    const y = Math.round(area.y + Math.max(0, (area.height - size.height) / 2))
-
-    managed.resolvedScale = scale
-    managed.view.setBounds({ x, y, width: size.width, height: size.height })
-    managed.view.setVisible(true)
-
-    if (managed.emulationReady) {
-      void this.#applyDeviceMetrics(managed).catch((error: unknown) => {
-        console.warn(`[viewportable] Metrics update failed for ${managed.device.name}`, error)
-      })
-    }
+    this.#layoutAllViewports()
+    this.#emitPrimaryState()
   }
 
   inspectLayout(): Array<{
@@ -223,6 +219,51 @@ export class ViewportManager {
     }
 
     this.#viewports.clear()
+  }
+
+  #layoutAllViewports(): void {
+    const candidates = [...this.#viewports.values()]
+      .filter(({ lastArea }) => lastArea && lastArea.width > 0 && lastArea.height > 0)
+      .map(({ device, lastArea }) => ({
+        device,
+        area: { width: lastArea!.width, height: lastArea!.height },
+      }))
+
+    const proportionalScale =
+      this.#scaleMode === 'proportional' ? resolveProportionalScale(candidates) : 0
+
+    for (const managed of this.#viewports.values()) {
+      const area = managed.lastArea
+
+      if (!area || area.width <= 0 || area.height <= 0) {
+        managed.view.setVisible(false)
+        continue
+      }
+
+      const scale =
+        this.#scaleMode === 'proportional'
+          ? proportionalScale
+          : resolveFitScale(managed.device, area)
+
+      if (scale <= 0) {
+        managed.view.setVisible(false)
+        continue
+      }
+
+      const size = scaledSize(managed.device, scale)
+      const x = Math.round(area.x + Math.max(0, (area.width - size.width) / 2))
+      const y = Math.round(area.y + Math.max(0, (area.height - size.height) / 2))
+
+      managed.resolvedScale = scale
+      managed.view.setBounds({ x, y, width: size.width, height: size.height })
+      managed.view.setVisible(true)
+
+      if (managed.emulationReady) {
+        void this.#applyDeviceMetrics(managed).catch((error: unknown) => {
+          console.warn(`[viewportable] Metrics update failed for ${managed.device.name}`, error)
+        })
+      }
+    }
   }
 
   #configureViewport(managed: ManagedViewport): void {
@@ -333,6 +374,10 @@ export class ViewportManager {
       canGoForward: contents.navigationHistory.canGoForward(),
       isLoading: contents.isLoading(),
       error: this.#lastError,
+      scaleMode: this.#scaleMode,
+      viewportScales: Object.fromEntries(
+        [...this.#viewports.values()].map(({ id, resolvedScale }) => [id, resolvedScale]),
+      ),
     })
   }
 }

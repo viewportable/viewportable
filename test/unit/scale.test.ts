@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { DEVICES, expectedPhysicalWidthMm } from '../../src/shared/device'
-import { resolveFitScale, scaledSize } from '../../src/shared/scale'
+import {
+  resolveFitScale,
+  resolveProportionalScale,
+  scaledSize,
+} from '../../src/shared/scale'
 
 const phone = DEVICES[0]!
+const tablet = DEVICES[1]!
 
 describe('resolveFitScale', () => {
   it('never upscales above 1', () => {
@@ -17,6 +22,26 @@ describe('resolveFitScale', () => {
   it('returns zero for a hidden or collapsed host', () => {
     expect(resolveFitScale(phone, { width: 0, height: 500 })).toBe(0)
     expect(resolveFitScale(phone, { width: 500, height: 0 })).toBe(0)
+  })
+})
+
+describe('resolveProportionalScale', () => {
+  it('uses one shared scale constrained by the tightest viewport', () => {
+    expect(
+      resolveProportionalScale([
+        { device: phone, area: { width: 393, height: 852 } },
+        { device: tablet, area: { width: 400, height: 640 } },
+      ]),
+    ).toBeCloseTo(0.5, 5)
+  })
+
+  it('ignores collapsed viewport areas', () => {
+    expect(
+      resolveProportionalScale([
+        { device: phone, area: { width: 0, height: 0 } },
+        { device: tablet, area: { width: 800, height: 1280 } },
+      ]),
+    ).toBe(1)
   })
 })
 
