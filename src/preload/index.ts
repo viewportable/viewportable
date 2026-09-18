@@ -1,13 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import {
-  BrowserCommandSchema,
-  BrowserStateSchema,
-  IPC,
-  ViewportBoundsSchema,
-  type BrowserCommand,
-  type BrowserState,
-  type ViewportBounds,
-} from '../shared/ipc'
+import { IPC } from '../shared/ipc-channels'
+import type { BrowserCommand, BrowserState, ViewportBounds } from '../shared/ipc'
 
 export type ViewportableApi = {
   command(command: BrowserCommand): void
@@ -17,14 +10,14 @@ export type ViewportableApi = {
 
 const api: ViewportableApi = {
   command(command) {
-    ipcRenderer.send(IPC.command, BrowserCommandSchema.parse(command))
+    ipcRenderer.send(IPC.command, command)
   },
   setViewportBounds(bounds) {
-    ipcRenderer.send(IPC.bounds, ViewportBoundsSchema.parse(bounds))
+    ipcRenderer.send(IPC.bounds, bounds)
   },
   onBrowserState(listener) {
-    const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => {
-      listener(BrowserStateSchema.parse(payload))
+    const handler = (_event: Electron.IpcRendererEvent, payload: BrowserState) => {
+      listener(payload)
     }
 
     ipcRenderer.on(IPC.state, handler)

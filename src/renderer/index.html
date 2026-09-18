@@ -5,9 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <title>Viewportable</title>
+    <style>
+      html,
+      body,
+      #root {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        background: #0b0d10;
+      }
+
+      .boot-loading {
+        display: grid;
+        width: 100%;
+        height: 100%;
+        place-items: center;
+        color: #c9cdd3;
+        font: 13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        letter-spacing: 0.02em;
+        animation: viewportable-loading-blink 1s steps(2, end) infinite;
+      }
+
+      @keyframes viewportable-loading-blink {
+        50% {
+          opacity: 0.25;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-loading">Loading...</div>
+    </div>
     <script type="module" src="/main.tsx"></script>
   </body>
 </html>

@@ -206,9 +206,22 @@ export class ViewportManager {
 
   destroy(): void {
     for (const { view } of this.#viewports.values()) {
-      this.#window.contentView.removeChildView(view)
-      view.webContents.close()
+      try {
+        if (!this.#window.isDestroyed()) {
+          this.#window.contentView.removeChildView(view)
+        }
+      } catch {
+        // Electron may already have destroyed the native View during app shutdown.
+      }
+
+      try {
+        const contents = view.webContents
+        if (!contents.isDestroyed()) contents.close()
+      } catch {
+        // Cleanup is intentionally idempotent during Ctrl-C / app termination.
+      }
     }
+
     this.#viewports.clear()
   }
 

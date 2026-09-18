@@ -85,8 +85,10 @@ function createWindow(): BrowserWindow {
   }
 
   window.once('ready-to-show', () => window.show())
-  window.on('closed', () => {
+  window.once('close', () => {
     manager.destroy()
+  })
+  window.on('closed', () => {
     if (mainWindow === window) mainWindow = null
     if (viewportManager === manager) viewportManager = null
   })

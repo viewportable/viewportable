@@ -1,10 +1,7 @@
 import { z } from 'zod'
+import { IPC } from './ipc-channels'
 
-export const IPC = {
-  command: 'viewportable:command',
-  bounds: 'viewportable:bounds',
-  state: 'viewportable:state',
-} as const
+export { IPC }
 
 export const BrowserCommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('navigate'), url: z.string().min(1) }),
