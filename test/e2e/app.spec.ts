@@ -30,8 +30,11 @@ test.beforeAll(async () => {
   if (!address || typeof address === 'string') throw new Error('Unable to determine test server port')
   origin = `http://127.0.0.1:${address.port}`
 
+  const args =
+    process.platform === 'linux' ? ['--disable-gpu', '--disable-dev-shm-usage', '.'] : ['.']
+
   app = await electron.launch({
-    args: ['--disable-gpu', '--disable-dev-shm-usage', '.'],
+    args,
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -67,12 +70,9 @@ test('opens the shell and renders two independently emulated viewports', async (
 
   for (const profile of profiles) {
     expect(profile.userAgent).toContain('Chrome/152')
-
-    if (process.env.VIEWPORTABLE_DISABLE_CDP_EMULATION !== '1') {
-      expect(profile.maxTouchPoints).toBeGreaterThan(0)
-      expect(profile.pointerCoarse).toBe(true)
-      expect(profile.hoverNone).toBe(true)
-    }
+    expect(profile.maxTouchPoints).toBeGreaterThan(0)
+    expect(profile.pointerCoarse).toBe(true)
+    expect(profile.hoverNone).toBe(true)
   }
 })
 

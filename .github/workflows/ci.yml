@@ -41,13 +41,12 @@ jobs:
 
   electron-e2e:
     if: github.event_name == 'workflow_dispatch' || github.event.repository.visibility == 'public'
-    name: Electron E2E
+    name: Electron E2E (macOS)
     needs: fast
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    runs-on: macos-15
+    timeout-minutes: 12
     env:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
-      VIEWPORTABLE_DISABLE_CDP_EMULATION: '1'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -58,5 +57,5 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build app
         run: npm run build:app
-      - name: Run Electron E2E with D-Bus and Xvfb
-        run: dbus-run-session -- xvfb-run --auto-servernum --server-args="-screen 0 1440x1000x24" npm run test:e2e
+      - name: Run Electron E2E
+        run: npm run test:e2e
