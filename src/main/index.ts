@@ -61,7 +61,7 @@ function installDisplayMediaHandler(window: BrowserWindow): void {
       request.frame === window.webContents.mainFrame
 
     if (!isShellRequest) {
-      callback(null)
+      callback({})
       return
     }
 
@@ -78,11 +78,11 @@ function installDisplayMediaHandler(window: BrowserWindow): void {
           sources.find((candidate) => candidate.name === title) ??
           sources.find((candidate) => candidate.id.endsWith(':1'))
 
-        callback(source ? { video: source } : null)
+        callback(source ? { video: source } : {})
       })
       .catch((error: unknown) => {
         console.error('[viewportable] Unable to resolve recording source', error)
-        callback(null)
+        callback({})
       })
   })
 }

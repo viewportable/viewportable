@@ -33,6 +33,19 @@ export type ViewportRuntimeProfile = {
   resolvedScale: number
 }
 
+const LAYOUT_FRAME_MS = 16
+const SCALE_EPSILON = 0.000001
+
+function sameRectangle(left: Rectangle | null, right: Rectangle): boolean {
+  return (
+    left !== null &&
+    left.x === right.x &&
+    left.y === right.y &&
+    left.width === right.width &&
+    left.height === right.height
+  )
+}
+
 function traceStartup(message: string): void {
   if (process.env.VIEWPORTABLE_SELF_TEST === '1') {
     console.error(`[viewportable:startup] ${message}`)
@@ -59,6 +72,7 @@ export class ViewportManager {
   #lastError: string | null = null
   #scaleMode: ActiveScaleMode = 'fit'
   #currentUrl = 'https://example.com'
+  #layoutTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(
     window: BrowserWindow,
@@ -144,7 +158,7 @@ export class ViewportManager {
     if (plan.addIds.length > 0 || plan.removeIds.length > 0) {
       this.#invalidateViewportAreas()
     } else {
-      this.#layoutAllViewports()
+      this.#scheduleLayout()
     }
 
     this.#emitPrimaryState()
@@ -156,8 +170,8 @@ export class ViewportManager {
     if (this.#scaleMode === mode) return
 
     this.#scaleMode = mode
-    this.#layoutAllViewports()
     this.#emitPrimaryState()
+    this.#scheduleLayout()
   }
 
   emitState(): void {
@@ -168,9 +182,10 @@ export class ViewportManager {
     const managed = this.#viewports.get(viewportId)
     if (!managed) return
 
+    if (sameRectangle(managed.lastArea, area)) return
+
     managed.lastArea = area
-    this.#layoutAllViewports()
-    this.#emitPrimaryState()
+    this.#scheduleLayout()
   }
 
   inspectLayout(): Array<{
@@ -211,6 +226,8 @@ export class ViewportManager {
   }
 
   destroy(): void {
+    this.#cancelScheduledLayout()
+
     while (this.#viewportOrder.length > 0) {
       const id = this.#viewportOrder[0]
       if (!id) break
@@ -294,11 +311,37 @@ export class ViewportManager {
   }
 
   #invalidateViewportAreas(): void {
+    this.#cancelScheduledLayout()
+
+    const hiddenBounds = { x: 0, y: 0, width: 0, height: 0 }
+
     for (const managed of this.#managedViewports()) {
       managed.lastArea = null
-      managed.view.setVisible(false)
-      managed.view.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+
+      if (managed.view.getVisible()) managed.view.setVisible(false)
+      if (!sameRectangle(managed.view.getBounds(), hiddenBounds)) {
+        managed.view.setBounds(hiddenBounds)
+      }
     }
+  }
+
+  #scheduleLayout(): void {
+    if (this.#layoutTimer !== null) return
+
+    this.#layoutTimer = setTimeout(() => {
+      this.#layoutTimer = null
+      if (this.#window.isDestroyed()) return
+
+      this.#layoutAllViewports()
+      this.#emitPrimaryState()
+    }, LAYOUT_FRAME_MS)
+  }
+
+  #cancelScheduledLayout(): void {
+    if (this.#layoutTimer === null) return
+
+    clearTimeout(this.#layoutTimer)
+    this.#layoutTimer = null
   }
 
   #layoutAllViewports(): void {
@@ -317,15 +360,19 @@ export class ViewportManager {
       if (!managed) continue
 
       if (!layout.visible || !layout.bounds || layout.scale === null) {
-        managed.view.setVisible(false)
+        if (managed.view.getVisible()) managed.view.setVisible(false)
         continue
       }
 
-      managed.resolvedScale = layout.scale
-      managed.view.setBounds(layout.bounds)
-      managed.view.setVisible(true)
+      const scaleChanged = Math.abs(managed.resolvedScale - layout.scale) > SCALE_EPSILON
+      const boundsChanged = !sameRectangle(managed.view.getBounds(), layout.bounds)
 
-      if (managed.emulationReady) {
+      managed.resolvedScale = layout.scale
+
+      if (boundsChanged) managed.view.setBounds(layout.bounds)
+      if (!managed.view.getVisible()) managed.view.setVisible(true)
+
+      if (managed.emulationReady && scaleChanged) {
         void this.#applyDeviceMetrics(managed).catch((error: unknown) => {
           console.warn(`[viewportable] Metrics update failed for ${managed.device.name}`, error)
         })

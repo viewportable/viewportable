@@ -4,9 +4,10 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ViewportableApi } from '../../src/preload'
+import type { SaveRecordingRequest } from '../../src/shared/ipc'
 import { RecordingControl } from '../../src/renderer/components/RecordingControl'
 
-const saveRecording = vi.fn(async () => ({ status: 'saved' as const }))
+const saveRecording = vi.fn(async (_recording: SaveRecordingRequest) => ({ status: 'saved' as const }))
 
 class FakeMediaRecorder {
   static isTypeSupported = vi.fn((mimeType: string) => mimeType.startsWith('video/webm'))
