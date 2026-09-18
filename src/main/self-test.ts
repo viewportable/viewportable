@@ -19,7 +19,7 @@ export async function runElectronSelfTest(
   await waitForShell(window)
 
   const before = await waitForExpectedProfiles(manager, expectedUrlPrefix, DEFAULT_DEVICES)
-  const layout = manager.inspectLayout()
+  const layout = await waitForLayout(manager, DEFAULT_DEVICES.length)
 
   assert.equal(layout.length, DEFAULT_DEVICES.length)
 
@@ -151,6 +151,37 @@ async function waitForShell(window: BrowserWindow): Promise<void> {
   }
 
   throw new Error('Timed out waiting for the Device Board shell and preload API')
+}
+
+async function waitForLayout(
+  manager: ViewportManager,
+  expectedCount: number,
+): Promise<ReturnType<ViewportManager['inspectLayout']>> {
+  const deadline = Date.now() + TIMEOUT_MS
+  let lastLayout = manager.inspectLayout()
+
+  while (Date.now() < deadline) {
+    lastLayout = manager.inspectLayout()
+
+    const ready =
+      lastLayout.length === expectedCount &&
+      lastLayout.every(
+        (viewport) =>
+          viewport.area !== null &&
+          viewport.area.width > 0 &&
+          viewport.area.height > 0 &&
+          viewport.visible &&
+          viewport.bounds.width > 0 &&
+          viewport.bounds.height > 0,
+      )
+
+    if (ready) return lastLayout
+    await delay(POLL_INTERVAL_MS)
+  }
+
+  throw new Error(
+    `Timed out waiting for native viewport layout. Last layout: ${JSON.stringify(lastLayout)}`,
+  )
 }
 
 async function waitForExpectedProfiles(
