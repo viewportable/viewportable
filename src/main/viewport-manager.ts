@@ -11,6 +11,7 @@ export type ManagedViewport = {
   lastArea: Rectangle | null
   resolvedScale: number
   pageReady: boolean
+  emulationReady: boolean
 }
 
 export type ViewportRuntimeProfile = {
@@ -79,15 +80,14 @@ export class ViewportManager {
         lastArea: null,
         resolvedScale: 1,
         pageReady: false,
+        emulationReady: false,
       }
 
       this.#viewports.set(device.id, managed)
       traceStartup(`${device.id}:add-child:start`)
       window.contentView.addChildView(view)
       traceStartup(`${device.id}:add-child:done`)
-      traceStartup(`${device.id}:configure:start`)
       this.#configureViewport(managed)
-      traceStartup(`${device.id}:configure:done`)
     }
   }
 
@@ -154,7 +154,11 @@ export class ViewportManager {
     managed.view.setBounds({ x, y, width: size.width, height: size.height })
     managed.view.setVisible(true)
 
-    if (managed.pageReady) this.#applyDeviceMetrics(managed)
+    if (managed.emulationReady) {
+      void this.#applyDeviceMetrics(managed).catch((error: unknown) => {
+        console.warn(`[viewportable] Metrics update failed for ${managed.device.name}`, error)
+      })
+    }
   }
 
   async inspectProfiles(): Promise<ViewportRuntimeProfile[]> {
@@ -200,11 +204,6 @@ export class ViewportManager {
       if (modifier && ['+', '=', '-', '0'].includes(input.key)) event.preventDefault()
     })
 
-    if (process.env.VIEWPORTABLE_DISABLE_CDP_EMULATION !== '1') {
-      traceStartup(`${device.id}:cdp:deferred-until-load`)
-    }
-
-    traceStartup(`${device.id}:handlers:start`)
     contents.setWindowOpenHandler(({ url }) => {
       void this.navigate(url)
       return { action: 'deny' }
@@ -225,18 +224,10 @@ export class ViewportManager {
       managed.pageReady = true
       traceStartup(`${device.id}:did-finish-load`)
 
-      try {
-        this.#applyDeviceMetrics(managed)
-      } catch (error) {
-        console.error(`[viewportable] Device emulation failed for ${device.name}`, error)
-        return
-      }
-
-      if (process.env.VIEWPORTABLE_DISABLE_CDP_EMULATION !== '1') {
-        void this.#enableTouchEmulation(managed).catch((error: unknown) => {
-          console.warn(`[viewportable] Touch emulation unavailable for ${device.name}`, error)
-        })
-      }
+      void this.#applyFullEmulation(managed).catch((error: unknown) => {
+        managed.emulationReady = false
+        console.error(`[viewportable] Emulation failed for ${device.name}`, error)
+      })
     })
     contents.on('did-fail-load', (_event, errorCode, errorDescription, validatedUrl, isMainFrame) => {
       if (!isMainFrame || errorCode === -3) return
@@ -245,35 +236,26 @@ export class ViewportManager {
         this.#emitPrimaryState()
       }
     })
-    traceStartup(`${device.id}:handlers:done`)
+
+    traceStartup(`${device.id}:configure:done`)
   }
 
-  #applyDeviceMetrics(managed: ManagedViewport): void {
-    traceStartup(`${managed.id}:device-emulation:start`)
-    managed.view.webContents.enableDeviceEmulation({
-      screenPosition: 'mobile',
-      screenSize: managed.device.css,
-      viewSize: managed.device.css,
-      viewPosition: { x: 0, y: 0 },
-      deviceScaleFactor: managed.device.dpr,
-      scale: managed.resolvedScale,
-    })
-    traceStartup(`${managed.id}:device-emulation:done`)
-  }
-
-  async #enableTouchEmulation(managed: ManagedViewport): Promise<void> {
-    if (!managed.browser.touch) return
-
+  async #applyFullEmulation(managed: ManagedViewport): Promise<void> {
     const debuggerApi = managed.view.webContents.debugger
-    traceStartup(`${managed.id}:cdp:start`)
-    if (!debuggerApi.isAttached()) debuggerApi.attach('1.3')
-    traceStartup(`${managed.id}:cdp:attached`)
 
-    await debuggerApi.sendCommand('Emulation.setTouchEmulationEnabled', {
-      enabled: true,
-      maxTouchPoints: managed.browser.maxTouchPoints,
-    })
-    traceStartup(`${managed.id}:cdp:touch:done`)
+    traceStartup(`${managed.id}:cdp:attach:start`)
+    if (!debuggerApi.isAttached()) debuggerApi.attach('1.3')
+    traceStartup(`${managed.id}:cdp:attach:done`)
+
+    await this.#applyDeviceMetrics(managed)
+
+    if (managed.browser.touch) {
+      await debuggerApi.sendCommand('Emulation.setTouchEmulationEnabled', {
+        enabled: true,
+        maxTouchPoints: managed.browser.maxTouchPoints,
+      })
+      traceStartup(`${managed.id}:cdp:touch:done`)
+    }
 
     await debuggerApi.sendCommand('Emulation.setEmulatedMedia', {
       features: [
@@ -284,6 +266,27 @@ export class ViewportManager {
       ],
     })
     traceStartup(`${managed.id}:cdp:media:done`)
+
+    managed.emulationReady = true
+  }
+
+  async #applyDeviceMetrics(managed: ManagedViewport): Promise<void> {
+    const debuggerApi = managed.view.webContents.debugger
+    if (!debuggerApi.isAttached()) return
+
+    traceStartup(`${managed.id}:cdp:metrics:start:${managed.resolvedScale}`)
+    await debuggerApi.sendCommand('Emulation.setDeviceMetricsOverride', {
+      width: managed.device.css.width,
+      height: managed.device.css.height,
+      deviceScaleFactor: managed.device.dpr,
+      mobile: true,
+      scale: managed.resolvedScale,
+      screenWidth: managed.device.css.width,
+      screenHeight: managed.device.css.height,
+      positionX: 0,
+      positionY: 0,
+    })
+    traceStartup(`${managed.id}:cdp:metrics:done:${managed.resolvedScale}`)
   }
 
   #emitPrimaryState(): void {
