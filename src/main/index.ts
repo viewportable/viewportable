@@ -14,6 +14,11 @@ function traceStartup(message: string): void {
   }
 }
 
+function exitSelfTest(code: number): never {
+  console.error(`[viewportable:self-test] exiting with code ${code}`)
+  process.exit(code)
+}
+
 function createWindow(): BrowserWindow {
   traceStartup('browser-window:create:start')
   const window = new BrowserWindow({
@@ -55,10 +60,10 @@ function createWindow(): BrowserWindow {
   if (process.env.VIEWPORTABLE_SELF_TEST === '1') {
     window.webContents.once('did-finish-load', () => {
       void runElectronSelfTest(window, manager, initialUrl)
-        .then(() => app.exit(0))
+        .then(() => exitSelfTest(0))
         .catch((error: unknown) => {
           console.error('[viewportable:self-test] FAIL', error)
-          app.exit(1)
+          exitSelfTest(1)
         })
     })
   }

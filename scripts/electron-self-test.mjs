@@ -2,6 +2,8 @@ import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import electronPath from 'electron'
 
+const TIMEOUT_MS = 30_000
+
 const server = createServer((_request, response) => {
   response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
   response.end(`<!doctype html>
@@ -35,9 +37,16 @@ const child = spawn(electronPath, ['.'], {
   },
 })
 
+const watchdog = setTimeout(() => {
+  console.error(`[electron-self-test] Timed out after ${TIMEOUT_MS}ms; killing Electron`)
+  child.kill('SIGKILL')
+}, TIMEOUT_MS)
+
 const result = await new Promise((resolve) => {
   child.once('exit', (code, signal) => resolve({ code, signal }))
 })
+
+clearTimeout(watchdog)
 
 await new Promise((resolve, reject) => {
   server.close((error) => (error ? reject(error) : resolve()))
