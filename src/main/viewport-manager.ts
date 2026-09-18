@@ -25,6 +25,12 @@ export type ViewportRuntimeProfile = {
   resolvedScale: number
 }
 
+function traceStartup(message: string): void {
+  if (process.env.VIEWPORTABLE_SELF_TEST === '1') {
+    console.error(`[viewportable:startup] ${message}`)
+  }
+}
+
 type StateListener = (state: {
   url: string
   canGoBack: boolean
@@ -52,7 +58,9 @@ export class ViewportManager {
     this.#primaryId = devices[0]!.id
     this.#onState = onState
 
+    traceStartup('viewport-manager:constructor')
     for (const device of devices) {
+      traceStartup(`${device.id}:new-view:start`)
       const view = new WebContentsView({
         webPreferences: {
           nodeIntegration: false,
@@ -60,6 +68,8 @@ export class ViewportManager {
           sandbox: true,
         },
       })
+
+      traceStartup(`${device.id}:new-view:done`)
 
       const managed: ManagedViewport = {
         id: device.id,
@@ -70,9 +80,13 @@ export class ViewportManager {
         resolvedScale: 1,
       }
 
-      this.#configureViewport(managed)
       this.#viewports.set(device.id, managed)
+      traceStartup(`${device.id}:add-child:start`)
       window.contentView.addChildView(view)
+      traceStartup(`${device.id}:add-child:done`)
+      traceStartup(`${device.id}:configure:start`)
+      this.#configureViewport(managed)
+      traceStartup(`${device.id}:configure:done`)
     }
   }
 
@@ -82,8 +96,10 @@ export class ViewportManager {
 
   async navigate(value: string): Promise<void> {
     const url = normalizeUrl(value)
+    traceStartup(`navigate:start:${url}`)
     this.#lastError = null
     await Promise.allSettled([...this.#viewports.values()].map(({ view }) => view.webContents.loadURL(url)))
+    traceStartup(`navigate:done:${url}`)
     this.#emitPrimaryState()
   }
 
@@ -176,10 +192,12 @@ export class ViewportManager {
     const contents = view.webContents
 
     contents.setUserAgent(browser.userAgent)
+    traceStartup(`${device.id}:user-agent:done`)
     contents.on('before-input-event', (event, input) => {
       const modifier = process.platform === 'darwin' ? input.meta : input.control
       if (modifier && ['+', '=', '-', '0'].includes(input.key)) event.preventDefault()
     })
+    traceStartup(`${device.id}:device-emulation:start`)
     contents.enableDeviceEmulation({
       screenPosition: 'mobile',
       screenSize: device.css,
@@ -188,13 +206,16 @@ export class ViewportManager {
       deviceScaleFactor: device.dpr,
       scale: 1,
     })
+    traceStartup(`${device.id}:device-emulation:done`)
 
     if (process.env.VIEWPORTABLE_DISABLE_CDP_EMULATION !== '1') {
+      traceStartup(`${device.id}:cdp:start`)
       this.#enableTouchEmulation(managed).catch((error: unknown) => {
         console.warn(`[viewportable] Touch emulation unavailable for ${device.name}`, error)
       })
     }
 
+    traceStartup(`${device.id}:handlers:start`)
     contents.setWindowOpenHandler(({ url }) => {
       void this.navigate(url)
       return { action: 'deny' }
@@ -215,6 +236,7 @@ export class ViewportManager {
         this.#emitPrimaryState()
       }
     })
+    traceStartup(`${device.id}:handlers:done`)
   }
 
   async #enableTouchEmulation(managed: ManagedViewport): Promise<void> {
@@ -222,11 +244,13 @@ export class ViewportManager {
 
     const debuggerApi = managed.view.webContents.debugger
     if (!debuggerApi.isAttached()) debuggerApi.attach('1.3')
+    traceStartup(`${managed.id}:cdp:attached`)
 
     await debuggerApi.sendCommand('Emulation.setTouchEmulationEnabled', {
       enabled: true,
       maxTouchPoints: managed.browser.maxTouchPoints,
     })
+    traceStartup(`${managed.id}:cdp:touch:done`)
     await debuggerApi.sendCommand('Emulation.setEmulatedMedia', {
       features: [
         { name: 'pointer', value: 'coarse' },
@@ -235,6 +259,7 @@ export class ViewportManager {
         { name: 'any-hover', value: 'none' },
       ],
     })
+    traceStartup(`${managed.id}:cdp:media:done`)
   }
 
   #emitPrimaryState(): void {

@@ -8,7 +8,14 @@ import { ViewportManager } from './viewport-manager'
 let mainWindow: BrowserWindow | null = null
 let viewportManager: ViewportManager | null = null
 
+function traceStartup(message: string): void {
+  if (process.env.VIEWPORTABLE_SELF_TEST === '1') {
+    console.error(`[viewportable:startup] ${message}`)
+  }
+}
+
 function createWindow(): BrowserWindow {
+  traceStartup('browser-window:create:start')
   const window = new BrowserWindow({
     title: 'Viewportable',
     width: 1440,
@@ -26,6 +33,7 @@ function createWindow(): BrowserWindow {
     },
   })
 
+  traceStartup('browser-window:create:done')
   window.webContents.setZoomFactor(1)
   window.webContents.on('before-input-event', (event, input) => {
     const modifier = process.platform === 'darwin' ? input.meta : input.control
@@ -33,10 +41,12 @@ function createWindow(): BrowserWindow {
   })
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
+  traceStartup('viewport-manager:create:start')
   const manager = new ViewportManager(window, DEVICES, (state) => {
     if (!window.isDestroyed()) window.webContents.send(IPC.state, BrowserStateSchema.parse(state))
   })
 
+  traceStartup('viewport-manager:create:done')
   viewportManager = manager
   mainWindow = window
 
@@ -61,11 +71,14 @@ function createWindow(): BrowserWindow {
   })
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
+    traceStartup('shell:load-url')
     void window.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
+    traceStartup('shell:load-file')
     void window.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  traceStartup('viewports:load-initial-url')
   void manager.loadInitialUrl(initialUrl)
 
   return window
@@ -109,6 +122,7 @@ ipcMain.on(IPC.bounds, (_event, payload: unknown) => {
 })
 
 app.whenReady().then(() => {
+  traceStartup('app:ready')
   createWindow()
 
   app.on('activate', () => {
