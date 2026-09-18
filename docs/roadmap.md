@@ -10,7 +10,7 @@ The roadmap is ordered by product value and architectural leverage, not by featu
 - [x] Keep scale calculations pure.
 - [x] Introduce `src/core/board.ts` as the single source of truth for board selection and reconcile rules.
 - [ ] Move workspace/preset state transitions into core.
-- [ ] Move layout decisions into a pure core layout module.
+- [x] Move layout decisions into a pure core layout module.
 - [ ] Define sync semantics in core before wiring Electron events.
 - [ ] Keep React components dependent on core/protocol, never Electron APIs directly.
 - [ ] Reduce `ViewportManager` to orchestration + WebContentsView/CDP lifecycle.

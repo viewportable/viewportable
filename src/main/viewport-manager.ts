@@ -1,16 +1,12 @@
 import { BrowserWindow, WebContentsView, type Rectangle } from 'electron'
 import { planBoardReconcile, resolveBoardDevices } from '../core/board'
+import { resolveViewportLayouts } from '../core/layout'
 import {
   MOBILE_CHROMIUM_PROFILE,
   type BrowserProfile,
   type DeviceSpec,
 } from '../shared/device'
-import {
-  resolveFitScale,
-  resolveProportionalScale,
-  scaledSize,
-  type ActiveScaleMode,
-} from '../shared/scale'
+import type { ActiveScaleMode } from '../shared/scale'
 import { normalizeUrl } from '../shared/url'
 
 export type ManagedViewport = {
@@ -293,40 +289,26 @@ export class ViewportManager {
 
   #layoutAllViewports(): void {
     const managedViewports = this.#managedViewports()
-    const candidates = managedViewports
-      .filter(({ lastArea }) => lastArea && lastArea.width > 0 && lastArea.height > 0)
-      .map(({ device, lastArea }) => ({
+    const layouts = resolveViewportLayouts(
+      managedViewports.map(({ id, device, lastArea }) => ({
+        id,
         device,
-        area: { width: lastArea!.width, height: lastArea!.height },
-      }))
+        area: lastArea,
+      })),
+      this.#scaleMode,
+    )
 
-    const proportionalScale =
-      this.#scaleMode === 'proportional' ? resolveProportionalScale(candidates) : 0
+    for (const layout of layouts) {
+      const managed = this.#viewports.get(layout.id)
+      if (!managed) continue
 
-    for (const managed of managedViewports) {
-      const area = managed.lastArea
-
-      if (!area || area.width <= 0 || area.height <= 0) {
+      if (!layout.visible || !layout.bounds || layout.scale === null) {
         managed.view.setVisible(false)
         continue
       }
 
-      const scale =
-        this.#scaleMode === 'proportional'
-          ? proportionalScale
-          : resolveFitScale(managed.device, area)
-
-      if (scale <= 0) {
-        managed.view.setVisible(false)
-        continue
-      }
-
-      const size = scaledSize(managed.device, scale)
-      const x = Math.round(area.x + Math.max(0, (area.width - size.width) / 2))
-      const y = Math.round(area.y + Math.max(0, (area.height - size.height) / 2))
-
-      managed.resolvedScale = scale
-      managed.view.setBounds({ x, y, width: size.width, height: size.height })
+      managed.resolvedScale = layout.scale
+      managed.view.setBounds(layout.bounds)
       managed.view.setVisible(true)
 
       if (managed.emulationReady) {
