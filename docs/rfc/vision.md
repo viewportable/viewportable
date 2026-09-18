@@ -111,7 +111,7 @@ Legend: ✅ available, ◐ partial/basic, — not a primary capability, 🧭 pla
 | Navigation sync | ✅ common URL | ✅ configurable | ✅ | ✅ | ✅ | ✅ | — |
 | Per-pane independent URL | — | 🧭 | ◐ | ? | ✅ | ? | n/a |
 | Screenshots | — | 🧭 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Recording | — | 🧭 board + selected viewport | ✅ | ? | ◐ | ✅ | — |
+| Recording | ✅ whole board V1 | 🧭 selected viewport + evidence bundle | ✅ | ? | ◐ | ✅ | — |
 | Breakpoint discovery/generation | — | 🧭 | ? | ? | ✅ | ? | ◐ |
 | Accessibility audit | — | later | ? | ? | ✅ strong | ? | ✅ |
 | Responsive overflow diagnostics | — | 🧭 Slice | ? | ? | ✅ debug tooling | ? | ◐ |
@@ -128,7 +128,7 @@ Chrome DevTools remains the reference for low-level Chromium debugging, network/
 
 Viewportable's intended differentiation is the combination of Proportional scale, calibrated True 1:1, deterministic Slice diagnostics and a reusable automation-friendly core.
 
-Screen recording is a planned developer-tool capability. The implementation must be explicit about capture scope: whole Device Board versus selected viewport. The recording path must capture the real native `WebContentsView` composition rather than only the React shell.
+Screen recording is a developer-evidence capability. V1 records the whole Viewportable window through the OS window-capture path so the result includes the real native `WebContentsView` composition rather than only the React shell. The next layer is selected-viewport recording plus a machine-readable session sidecar with device selection, scale mode and interaction events for reproducible bug reports.
 
 ## Official sources
 

@@ -20,6 +20,9 @@ describe('Toolbar', () => {
       onBrowserState() {
         return () => {}
       },
+      async saveRecording() {
+        return { status: 'saved' }
+      },
     }
 
     Object.defineProperty(window, 'viewportable', {

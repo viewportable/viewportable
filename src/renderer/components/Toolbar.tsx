@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import type { BrowserState } from '../../shared/ipc'
+import { RecordingControl } from './RecordingControl'
 
 type Props = {
   state: BrowserState
@@ -66,6 +67,7 @@ export function Toolbar({ state }: Props) {
       </form>
 
       <div className="toolbar-meta">
+        <RecordingControl />
         <div className="scale-control" aria-label="Viewport scale mode">
           <button
             type="button"

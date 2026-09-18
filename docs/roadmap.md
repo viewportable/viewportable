@@ -82,9 +82,11 @@ Integrate Slice as a separate diagnostics layer rather than coupling it to the E
 - [ ] Screenshot single viewport.
 - [ ] Screenshot whole board.
 - [ ] Record selected viewport.
-- [ ] Record whole Device Board, including native `WebContentsView` content.
-- [ ] Recording controls: start/stop, elapsed time, save/export.
-- [ ] Decide cursor/audio behavior after reviewing real usage video.
+- [x] Record whole Device Board, including native `WebContentsView` content.
+- [x] Recording controls: start/stop, elapsed time, save/export.
+- [x] V1 records video only; audio is intentionally excluded.
+- [ ] Verify cursor inclusion consistently across macOS, Windows and Linux.
+- [ ] Add a recording evidence bundle (`video + session.json`) with device/scale/action timeline.
 - [ ] Breakpoint discovery from page CSS.
 - [ ] Relevant media/user preference emulation.
 - [ ] Network throttling where useful.

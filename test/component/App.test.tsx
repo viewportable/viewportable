@@ -103,6 +103,9 @@ function installViewportableMock(): void {
       }
     },
     setViewportBounds() {},
+    async saveRecording() {
+      return { status: 'saved' }
+    },
     onBrowserState(nextListener) {
       listener = nextListener
       return () => {

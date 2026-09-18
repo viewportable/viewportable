@@ -1,8 +1,23 @@
-import { app, BrowserWindow, ipcMain, Menu, type MenuItemConstructorOptions } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  desktopCapturer,
+  dialog,
+  ipcMain,
+  Menu,
+  type MenuItemConstructorOptions,
+} from 'electron'
 import { writeFileSync } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { DEFAULT_DEVICES } from '../shared/device'
-import { BrowserCommandSchema, BrowserStateSchema, IPC, ViewportBoundsSchema } from '../shared/ipc'
+import {
+  BrowserCommandSchema,
+  BrowserStateSchema,
+  IPC,
+  SaveRecordingRequestSchema,
+  ViewportBoundsSchema,
+} from '../shared/ipc'
 import { runElectronSelfTest } from './self-test'
 import { ViewportManager } from './viewport-manager'
 
@@ -36,6 +51,40 @@ function installApplicationMenu(): void {
   ]
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+function installDisplayMediaHandler(window: BrowserWindow): void {
+  window.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
+    const isShellRequest =
+      request.videoRequested &&
+      request.frame !== null &&
+      request.frame === window.webContents.mainFrame
+
+    if (!isShellRequest) {
+      callback(null)
+      return
+    }
+
+    void desktopCapturer
+      .getSources({
+        types: ['window'],
+        thumbnailSize: { width: 0, height: 0 },
+        fetchWindowIcons: false,
+      })
+      .then((sources) => {
+        const title = window.getTitle()
+        const source =
+          sources.find((candidate) => candidate.name === title && candidate.id.endsWith(':1')) ??
+          sources.find((candidate) => candidate.name === title) ??
+          sources.find((candidate) => candidate.id.endsWith(':1'))
+
+        callback(source ? { video: source } : null)
+      })
+      .catch((error: unknown) => {
+        console.error('[viewportable] Unable to resolve recording source', error)
+        callback(null)
+      })
+  })
 }
 
 function traceStartup(message: string): void {
@@ -78,6 +127,7 @@ function createWindow(): BrowserWindow {
   })
 
   traceStartup('browser-window:create:done')
+  installDisplayMediaHandler(window)
   window.webContents.setZoomFactor(1)
   window.webContents.on('before-input-event', (event, input) => {
     const modifier = process.platform === 'darwin' ? input.meta : input.control
@@ -164,6 +214,31 @@ ipcMain.on(IPC.command, (_event, payload: unknown) => {
       void manager.setDevices(command.deviceIds)
       break
   }
+})
+
+ipcMain.handle(IPC.saveRecording, async (event, payload: unknown) => {
+  const window = BrowserWindow.fromWebContents(event.sender)
+  if (!window || window !== mainWindow) throw new Error('Recording save request is not from the shell')
+
+  const recording = SaveRecordingRequestSchema.parse(payload)
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const defaultPath = `viewportable-recording-${timestamp}.${recording.extension}`
+
+  const result = await dialog.showSaveDialog(window, {
+    title: 'Save Viewportable recording',
+    defaultPath,
+    filters: [
+      {
+        name: recording.extension === 'mp4' ? 'MP4 Video' : 'WebM Video',
+        extensions: [recording.extension],
+      },
+    ],
+  })
+
+  if (result.canceled || !result.filePath) return { status: 'cancelled' } as const
+
+  await writeFile(result.filePath, Buffer.from(recording.bytes))
+  return { status: 'saved' } as const
 })
 
 ipcMain.on(IPC.bounds, (_event, payload: unknown) => {

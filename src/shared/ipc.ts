@@ -47,3 +47,15 @@ export const BrowserStateSchema = z.object({
 })
 
 export type BrowserState = z.infer<typeof BrowserStateSchema>
+
+export const SaveRecordingRequestSchema = z.object({
+  bytes: z.instanceof(Uint8Array),
+  mimeType: z.string().min(1),
+  extension: z.enum(['webm', 'mp4']),
+})
+
+export type SaveRecordingRequest = z.infer<typeof SaveRecordingRequestSchema>
+
+export type SaveRecordingResult = {
+  status: 'saved' | 'cancelled'
+}
