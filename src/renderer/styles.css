@@ -370,6 +370,7 @@ h1 {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
   scrollbar-gutter: stable;
 }
 
@@ -390,6 +391,7 @@ h1 {
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
+  scroll-snap-align: start;
   border: 1px solid #262c34;
   border-radius: 10px;
   background: #0e1115;
@@ -487,4 +489,20 @@ h1 {
   .toolbar {
     grid-template-columns: auto auto minmax(180px, 1fr);
   }
+}
+
+
+.viewport-clipped-hint {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 8px;
+  border: 1px solid #2a3038;
+  border-radius: 999px;
+  color: #727b87;
+  background: rgb(14 17 21 / 92%);
+  font-size: 9px;
+  white-space: nowrap;
+  pointer-events: none;
 }

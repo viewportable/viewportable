@@ -19,8 +19,8 @@ Exit criterion: board selection, ordering, scaling and sync state can be tested 
 
 ## Next: make the Device Board feel native
 
-- [ ] Correct partially visible viewport behavior.
-- [ ] Add horizontal scroll snapping.
+- [ ] Correct partially visible viewport behavior. Current safety behavior hides native content and shows an explicit reveal hint; true clipped native rendering still needs a dedicated solution.
+- [x] Add horizontal scroll snapping.
 - [ ] Preserve selected/revealed device during board changes.
 - [ ] Add clear loading/error states per viewport.
 - [ ] Add keyboard navigation across devices.

@@ -140,7 +140,13 @@ export class ViewportManager {
     }
 
     this.#viewportOrder = plan.deviceIds
-    this.#layoutAllViewports()
+
+    if (plan.addIds.length > 0 || plan.removeIds.length > 0) {
+      this.#invalidateViewportAreas()
+    } else {
+      this.#layoutAllViewports()
+    }
+
     this.#emitPrimaryState()
 
     await Promise.allSettled(loads)
@@ -285,6 +291,14 @@ export class ViewportManager {
 
     this.#viewports.delete(id)
     this.#viewportOrder = this.#viewportOrder.filter((viewportId) => viewportId !== id)
+  }
+
+  #invalidateViewportAreas(): void {
+    for (const managed of this.#managedViewports()) {
+      managed.lastArea = null
+      managed.view.setVisible(false)
+      managed.view.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+    }
   }
 
   #layoutAllViewports(): void {

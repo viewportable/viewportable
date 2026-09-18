@@ -48,7 +48,7 @@ export function App() {
 
     const frame = requestAnimationFrame(() => {
       const card = document.querySelector<HTMLElement>(`[data-device-card-id="${deviceId}"]`)
-      card?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' })
+      card?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' })
       pendingRevealRef.current = null
     })
 
@@ -59,6 +59,7 @@ export function App() {
     () => resolveBoardDevices(state.activeDeviceIds),
     [state.activeDeviceIds],
   )
+  const boardLayoutRevision = state.activeDeviceIds.join('|')
 
   function toggleDevice(deviceId: string) {
     const result = toggleBoardDevice(selectionRef.current, deviceId)
@@ -108,6 +109,7 @@ export function App() {
                   device={device}
                   scale={state.viewportScales[device.id] ?? 1}
                   removable={activeDevices.length > 1}
+                  layoutRevision={boardLayoutRevision}
                   onRemove={() => toggleDevice(device.id)}
                 />
               ))}

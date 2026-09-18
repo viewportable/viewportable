@@ -90,6 +90,7 @@ export async function runElectronSelfTest(
   await manager.setDevices(expandedIds)
 
   const expanded = await waitForExpectedProfiles(manager, expectedUrlPrefix, expandedDevices)
+  await waitForReportedLayout(manager, expandedDevices.length)
   assert.equal(expanded.length, 3, 'Dynamic device add did not create a third viewport')
   assert.ok(
     expanded.some((profile) => profile.id === 'compact-phone' && profile.innerWidth === 360),
@@ -98,6 +99,7 @@ export async function runElectronSelfTest(
 
   await manager.setDevices(DEFAULT_DEVICE_IDS)
   await waitForExpectedProfiles(manager, expectedUrlPrefix, DEFAULT_DEVICES)
+  await waitForReportedLayout(manager, DEFAULT_DEVICES.length)
   assert.equal(manager.inspectLayout().length, DEFAULT_DEVICES.length, 'Dynamic device remove failed')
 
   await manager.setDevices(expandedIds)
