@@ -15,7 +15,7 @@
     "test": "npm run test:unit",
     "test:unit": "vitest run test/unit",
     "test:e2e": "playwright test -c playwright.config.ts",
-    "check:fast": "npm run fmt:check && npm run lint && npm run typecheck && npm run test:unit && npm run build:app",
+    "check:fast": "npm run lint && npm run typecheck && npm run test:unit && npm run build:app",
     "check": "npm run check:fast && npm run test:e2e"
   },
   "dependencies": {

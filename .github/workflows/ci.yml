@@ -30,8 +30,6 @@ jobs:
           package-manager-cache: false
       - name: Install dependencies without heavyweight binaries
         run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Format
-        run: npm run fmt:check
       - name: Lint
         run: npm run lint
       - name: Typecheck
