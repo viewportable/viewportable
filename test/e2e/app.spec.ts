@@ -60,14 +60,19 @@ test('opens the shell and renders two independently emulated viewports', async (
   await expect.poll(async () => getViewportProfiles()).toHaveLength(2)
 
   const profiles = await getViewportProfiles()
+  console.log('[e2e] viewport profiles', JSON.stringify(profiles))
+
   expect(profiles.map((profile) => profile.innerWidth).sort((a, b) => a - b)).toEqual([393, 800])
   expect(profiles.map((profile) => profile.devicePixelRatio).sort((a, b) => a - b)).toEqual([2, 3])
 
   for (const profile of profiles) {
-    expect(profile.maxTouchPoints).toBeGreaterThan(0)
-    expect(profile.pointerCoarse).toBe(true)
-    expect(profile.hoverNone).toBe(true)
     expect(profile.userAgent).toContain('Chrome/152')
+
+    if (process.env.VIEWPORTABLE_DISABLE_CDP_EMULATION !== '1') {
+      expect(profile.maxTouchPoints).toBeGreaterThan(0)
+      expect(profile.pointerCoarse).toBe(true)
+      expect(profile.hoverNone).toBe(true)
+    }
   }
 })
 

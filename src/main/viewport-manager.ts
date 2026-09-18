@@ -153,9 +153,11 @@ export class ViewportManager {
       scale: 1,
     })
 
-    this.#enableTouchEmulation(managed).catch((error: unknown) => {
-      console.warn(`[viewportable] Touch emulation unavailable for ${device.name}`, error)
-    })
+    if (process.env.VIEWPORTABLE_DISABLE_CDP_EMULATION !== '1') {
+      this.#enableTouchEmulation(managed).catch((error: unknown) => {
+        console.warn(`[viewportable] Touch emulation unavailable for ${device.name}`, error)
+      })
+    }
 
     contents.setWindowOpenHandler(({ url }) => {
       void this.navigate(url)
