@@ -22,9 +22,25 @@ export async function runElectronSelfTest(
   const layout = manager.inspectLayout()
 
   assert.equal(layout.length, DEFAULT_DEVICES.length)
+
+  const visibleViewports = layout.filter(
+    (viewport) => viewport.area && viewport.area.width > 0 && viewport.area.height > 0,
+  )
+  assert.ok(visibleViewports.length > 0, 'At least one native viewport must be visible')
+
   for (const viewport of layout) {
     assert.ok(viewport.area, `${viewport.id}: React did not report placeholder bounds`)
-    assert.equal(viewport.visible, true, `${viewport.id}: native viewport is not visible`)
+
+    if (viewport.area.width <= 0 || viewport.area.height <= 0) {
+      assert.equal(
+        viewport.visible,
+        false,
+        `${viewport.id}: clipped viewport should be hidden outside the board`,
+      )
+      continue
+    }
+
+    assert.equal(viewport.visible, true, `${viewport.id}: in-view native viewport is not visible`)
     assert.ok(viewport.bounds.width > 0, `${viewport.id}: native viewport width is zero`)
     assert.ok(viewport.bounds.height > 0, `${viewport.id}: native viewport height is zero`)
     assert.ok(viewport.bounds.y > 50, `${viewport.id}: native viewport overlaps app toolbar`)

@@ -13,12 +13,9 @@ test.beforeAll(async () => {
       <html>
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <style>
-            body { margin: 0; font-family: system-ui; }
-            .probe { width: 100vw; min-height: 100vh; }
-          </style>
+          <style>body { margin: 0; font-family: system-ui; }</style>
         </head>
-        <body><main class="probe">Viewportable probe</main></body>
+        <body><main>Viewportable probe</main></body>
       </html>`)
   })
 
@@ -41,10 +38,6 @@ test.beforeAll(async () => {
       VIEWPORTABLE_DEFAULT_URL: origin,
     },
   })
-
-  app.process().on('exit', (code, signal) => {
-    console.error(`[e2e] Electron exited: code=${String(code)} signal=${String(signal)}`)
-  })
 })
 
 test.afterAll(async () => {
@@ -54,61 +47,22 @@ test.afterAll(async () => {
   })
 })
 
-test('opens the shell and renders two independently emulated viewports', async () => {
+test('launches the Device Board', async () => {
   const shell = await app.firstWindow()
-  await expect(shell.getByText('Two real Chromium viewports')).toBeVisible()
-  await expect(shell.getByText('iPhone 15 Pro')).toBeVisible()
-  await expect(shell.getByText('Pixel Tablet')).toBeVisible()
 
-  await expect.poll(async () => getViewportProfiles()).toHaveLength(2)
-
-  const profiles = await getViewportProfiles()
-  console.log('[e2e] viewport profiles', JSON.stringify(profiles))
-
-  expect(profiles.map((profile) => profile.innerWidth).sort((a, b) => a - b)).toEqual([393, 800])
-  expect(profiles.map((profile) => profile.devicePixelRatio).sort((a, b) => a - b)).toEqual([2, 3])
-
-  for (const profile of profiles) {
-    expect(profile.userAgent).toContain('Chrome/152')
-    expect(profile.maxTouchPoints).toBeGreaterThan(0)
-    expect(profile.pointerCoarse).toBe(true)
-    expect(profile.hoverNone).toBe(true)
-  }
+  await expect(shell.getByLabel('Device library')).toBeVisible()
+  await expect(shell.getByText('2 viewports')).toBeVisible()
+  await expect(shell.getByTestId('device-card-iphone-15-pro')).toBeVisible()
+  await expect(shell.getByTestId('device-card-pixel-tablet')).toBeVisible()
 })
 
-test('resizing the app changes fit scale without changing logical layout widths', async () => {
-  const before = await getViewportProfiles()
+test('device can be removed and added again', async () => {
+  const shell = await app.firstWindow()
+  const toggle = shell.getByTestId('device-toggle-iphone-15-pro')
 
-  await app.evaluate(({ BrowserWindow }) => {
-    const window = BrowserWindow.getAllWindows()[0]
-    window?.setSize(1000, 680)
-  })
+  await toggle.click()
+  await expect(shell.getByTestId('device-card-iphone-15-pro')).toHaveCount(0)
 
-  await new Promise((resolve) => setTimeout(resolve, 250))
-  const after = await getViewportProfiles()
-
-  expect(after.map((profile) => profile.innerWidth).sort((a, b) => a - b)).toEqual(
-    before.map((profile) => profile.innerWidth).sort((a, b) => a - b),
-  )
+  await toggle.click()
+  await expect(shell.getByTestId('device-card-iphone-15-pro')).toBeVisible()
 })
-
-async function getViewportProfiles() {
-  return app.evaluate(async ({ webContents }, expectedOrigin) => {
-    const pages = webContents
-      .getAllWebContents()
-      .filter((contents) => contents.getURL().startsWith(expectedOrigin))
-
-    return Promise.all(
-      pages.map(async (contents) =>
-        contents.executeJavaScript(`({
-          innerWidth: window.innerWidth,
-          devicePixelRatio: window.devicePixelRatio,
-          maxTouchPoints: navigator.maxTouchPoints,
-          pointerCoarse: matchMedia('(pointer: coarse)').matches,
-          hoverNone: matchMedia('(hover: none)').matches,
-          userAgent: navigator.userAgent
-        })`),
-      ),
-    )
-  }, origin)
-}

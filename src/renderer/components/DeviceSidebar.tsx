@@ -57,6 +57,8 @@ export function DeviceSidebar({ activeDeviceIds, onToggleDevice }: Props) {
                     type="button"
                     className={selected ? 'device-row active' : 'device-row'}
                     aria-pressed={selected}
+                    aria-label={`${selected ? 'Remove' : 'Add'} ${device.name}`}
+                    data-testid={`device-toggle-${device.id}`}
                     disabled={cannotRemove}
                     onClick={() => onToggleDevice(device.id)}
                   >
