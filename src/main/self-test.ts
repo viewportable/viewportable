@@ -78,11 +78,18 @@ async function waitForShell(window: BrowserWindow): Promise<void> {
 
   while (Date.now() < deadline) {
     const shell = (await window.webContents.executeJavaScript(`({
-      text: document.body.innerText,
+      hasAppShell: document.querySelector('.app-shell') !== null,
+      hasScaleControl: document.querySelector('[aria-label="Viewport scale mode"]') !== null,
+      hasViewportGrid: document.querySelector('.viewport-grid') !== null,
       hasApi: typeof window.viewportable === 'object'
-    })`)) as { text: string; hasApi: boolean }
+    })`)) as {
+      hasAppShell: boolean
+      hasScaleControl: boolean
+      hasViewportGrid: boolean
+      hasApi: boolean
+    }
 
-    if (shell.text.includes('Two real Chromium viewports') && shell.text.includes('Proportional') && shell.hasApi) return
+    if (shell.hasAppShell && shell.hasScaleControl && shell.hasViewportGrid && shell.hasApi) return
     await delay(POLL_INTERVAL_MS)
   }
 
