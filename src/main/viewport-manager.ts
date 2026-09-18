@@ -12,6 +12,19 @@ export type ManagedViewport = {
   resolvedScale: number
 }
 
+export type ViewportRuntimeProfile = {
+  id: string
+  url: string
+  innerWidth: number
+  innerHeight: number
+  devicePixelRatio: number
+  maxTouchPoints: number
+  pointerCoarse: boolean
+  hoverNone: boolean
+  userAgent: string
+  resolvedScale: number
+}
+
 type StateListener = (state: {
   url: string
   canGoBack: boolean
@@ -125,6 +138,29 @@ export class ViewportManager {
     })
     managed.view.setBounds({ x, y, width: size.width, height: size.height })
     managed.view.setVisible(true)
+  }
+
+  async inspectProfiles(): Promise<ViewportRuntimeProfile[]> {
+    return Promise.all(
+      [...this.#viewports.values()].map(async ({ id, view, resolvedScale }) => {
+        const runtime = (await view.webContents.executeJavaScript(`({
+          innerWidth: window.innerWidth,
+          innerHeight: window.innerHeight,
+          devicePixelRatio: window.devicePixelRatio,
+          maxTouchPoints: navigator.maxTouchPoints,
+          pointerCoarse: matchMedia('(pointer: coarse)').matches,
+          hoverNone: matchMedia('(hover: none)').matches,
+          userAgent: navigator.userAgent
+        })`)) as Omit<ViewportRuntimeProfile, 'id' | 'url' | 'resolvedScale'>
+
+        return {
+          id,
+          url: view.webContents.getURL(),
+          resolvedScale,
+          ...runtime,
+        }
+      }),
+    )
   }
 
   destroy(): void {

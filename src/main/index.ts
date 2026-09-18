@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { DEVICES } from '../shared/device'
 import { BrowserCommandSchema, BrowserStateSchema, IPC, ViewportBoundsSchema } from '../shared/ipc'
+import { runElectronSelfTest } from './self-test'
 import { ViewportManager } from './viewport-manager'
 
 let mainWindow: BrowserWindow | null = null
@@ -39,6 +40,19 @@ function createWindow(): BrowserWindow {
   viewportManager = manager
   mainWindow = window
 
+  const initialUrl = process.env.VIEWPORTABLE_DEFAULT_URL ?? 'https://example.com'
+
+  if (process.env.VIEWPORTABLE_SELF_TEST === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void runElectronSelfTest(window, manager, initialUrl)
+        .then(() => app.exit(0))
+        .catch((error: unknown) => {
+          console.error('[viewportable:self-test] FAIL', error)
+          app.exit(1)
+        })
+    })
+  }
+
   window.once('ready-to-show', () => window.show())
   window.on('closed', () => {
     manager.destroy()
@@ -52,7 +66,6 @@ function createWindow(): BrowserWindow {
     void window.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
-  const initialUrl = process.env.VIEWPORTABLE_DEFAULT_URL ?? 'https://example.com'
   void manager.loadInitialUrl(initialUrl)
 
   return window
