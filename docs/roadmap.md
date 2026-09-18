@@ -22,6 +22,7 @@ Exit criterion: board selection, ordering, scaling and sync state can be tested 
 - [ ] Correct partially visible viewport behavior. Current safety behavior hides native content and shows an explicit reveal hint; true clipped native rendering still needs a dedicated solution.
 - [x] Add horizontal scroll snapping.
 - [x] Coalesce native viewport layout updates to one commit per frame and skip unchanged bounds/CDP metrics.
+- [x] Send one transactional board-layout snapshot from React to Electron instead of per-card bounds IPC.
 - [ ] Preserve selected/revealed device during board changes.
 - [ ] Add clear loading/error states per viewport.
 - [ ] Add keyboard navigation across devices.

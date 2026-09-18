@@ -23,17 +23,38 @@ export const BrowserCommandSchema = z.discriminatedUnion('type', [
 
 export type BrowserCommand = z.infer<typeof BrowserCommandSchema>
 
+const LayoutRectSchema = z.object({
+  x: z.number().finite(),
+  y: z.number().finite(),
+  width: z.number().finite().nonnegative(),
+  height: z.number().finite().nonnegative(),
+})
+
 export const ViewportBoundsSchema = z.object({
   viewportId: z.string().min(1),
-  rect: z.object({
-    x: z.number().finite(),
-    y: z.number().finite(),
-    width: z.number().finite().nonnegative(),
-    height: z.number().finite().nonnegative(),
-  }),
+  rect: LayoutRectSchema,
 })
 
 export type ViewportBounds = z.infer<typeof ViewportBoundsSchema>
+
+export const BoardLayoutSnapshotSchema = z.object({
+  revision: z.number().int().nonnegative(),
+  viewports: z
+    .array(
+      z.object({
+        viewportId: z.string().min(1),
+        rect: LayoutRectSchema,
+      }),
+    )
+    .min(1)
+    .max(MAX_ACTIVE_DEVICES)
+    .refine(
+      (viewports) => new Set(viewports.map(({ viewportId }) => viewportId)).size === viewports.length,
+      'Viewport ids must be unique',
+    ),
+})
+
+export type BoardLayoutSnapshot = z.infer<typeof BoardLayoutSnapshotSchema>
 
 export const BrowserStateSchema = z.object({
   url: z.string(),

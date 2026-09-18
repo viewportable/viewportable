@@ -103,6 +103,7 @@ function installViewportableMock(): void {
       }
     },
     setViewportBounds() {},
+    setBoardLayout() {},
     async saveRecording() {
       return { status: 'saved' }
     },

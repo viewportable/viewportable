@@ -17,6 +17,7 @@ describe('Toolbar', () => {
     const api: ViewportableApi = {
       command,
       setViewportBounds() {},
+      setBoardLayout() {},
       onBrowserState() {
         return () => {}
       },

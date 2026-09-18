@@ -63,6 +63,7 @@ describe('RecordingControl', () => {
     const api: ViewportableApi = {
       command() {},
       setViewportBounds() {},
+      setBoardLayout() {},
       onBrowserState() {
         return () => {}
       },

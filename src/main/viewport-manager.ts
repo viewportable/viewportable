@@ -73,6 +73,7 @@ export class ViewportManager {
   #scaleMode: ActiveScaleMode = 'fit'
   #currentUrl = 'https://example.com'
   #layoutTimer: ReturnType<typeof setTimeout> | null = null
+  #lastBoardLayoutRevision = -1
 
   constructor(
     window: BrowserWindow,
@@ -175,6 +176,24 @@ export class ViewportManager {
   }
 
   emitState(): void {
+    this.#emitPrimaryState()
+  }
+
+  setBoardLayout(
+    revision: number,
+    viewports: readonly { viewportId: string; rect: Rectangle }[],
+  ): void {
+    if (revision <= this.#lastBoardLayoutRevision) return
+    this.#lastBoardLayoutRevision = revision
+
+    const areas = new Map(viewports.map(({ viewportId, rect }) => [viewportId, rect]))
+
+    for (const managed of this.#managedViewports()) {
+      managed.lastArea = areas.get(managed.id) ?? null
+    }
+
+    this.#cancelScheduledLayout()
+    this.#layoutAllViewports()
     this.#emitPrimaryState()
   }
 

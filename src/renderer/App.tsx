@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   normalizeBoardDeviceIds,
   resolveBoardDevices,
@@ -27,6 +27,9 @@ export function App() {
   const [state, setState] = useState<BrowserState>(INITIAL_STATE)
   const selectionRef = useRef<string[]>([...INITIAL_STATE.activeDeviceIds])
   const pendingRevealRef = useRef<string | null>(null)
+  const boardScrollRef = useRef<HTMLDivElement>(null)
+  const layoutRevisionRef = useRef(0)
+  const [clippedDeviceIds, setClippedDeviceIds] = useState<Set<string>>(() => new Set())
 
   useEffect(() => {
     const unsubscribe = window.viewportable.onBrowserState((nextState) => {
@@ -42,24 +45,96 @@ export function App() {
     return unsubscribe
   }, [])
 
-  useEffect(() => {
-    const deviceId = pendingRevealRef.current
-    if (!deviceId || !state.activeDeviceIds.includes(deviceId)) return
-
-    const frame = requestAnimationFrame(() => {
-      const card = document.querySelector<HTMLElement>(`[data-device-card-id="${deviceId}"]`)
-      card?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' })
-      pendingRevealRef.current = null
-    })
-
-    return () => cancelAnimationFrame(frame)
-  }, [state.activeDeviceIds])
-
   const activeDevices = useMemo(
     () => resolveBoardDevices(state.activeDeviceIds),
     [state.activeDeviceIds],
   )
-  const boardLayoutRevision = state.activeDeviceIds.join('|')
+  const boardLayoutKey = state.activeDeviceIds.join('|')
+
+  useLayoutEffect(() => {
+    const scrollContainer = boardScrollRef.current
+    if (!scrollContainer) return
+
+    const pendingDeviceId = pendingRevealRef.current
+    if (pendingDeviceId && state.activeDeviceIds.includes(pendingDeviceId)) {
+      const card = scrollContainer.querySelector<HTMLElement>(
+        `[data-device-card-id="${pendingDeviceId}"]`,
+      )
+      card?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' })
+      pendingRevealRef.current = null
+    }
+
+    const hosts = state.activeDeviceIds
+      .map((deviceId) =>
+        scrollContainer.querySelector<HTMLElement>(`[data-viewport-id="${deviceId}"]`),
+      )
+      .filter((host): host is HTMLElement => host !== null)
+
+    if (hosts.length === 0) return
+
+    let frame = 0
+
+    const measureAndSend = () => {
+      const clip = scrollContainer.getBoundingClientRect()
+      const clipped = new Set<string>()
+
+      const viewports = hosts.map((host) => {
+        const rect = host.getBoundingClientRect()
+        const viewportId = host.dataset.viewportId!
+        const fullyVisible =
+          rect.left >= clip.left - 1 &&
+          rect.right <= clip.right + 1 &&
+          rect.top >= clip.top - 1 &&
+          rect.bottom <= clip.bottom + 1
+
+        if (!fullyVisible) clipped.add(viewportId)
+
+        return {
+          viewportId,
+          rect: fullyVisible
+            ? {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+              }
+            : {
+                x: rect.x,
+                y: rect.y,
+                width: 0,
+                height: 0,
+              },
+        }
+      })
+
+      setClippedDeviceIds((current) => (sameStringSet(current, clipped) ? current : clipped))
+
+      window.viewportable.setBoardLayout({
+        revision: ++layoutRevisionRef.current,
+        viewports,
+      })
+    }
+
+    const scheduleMeasure = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(measureAndSend)
+    }
+
+    const observer = new ResizeObserver(scheduleMeasure)
+    observer.observe(scrollContainer)
+    hosts.forEach((host) => observer.observe(host))
+
+    window.addEventListener('resize', scheduleMeasure)
+    scrollContainer.addEventListener('scroll', scheduleMeasure, { passive: true })
+    scheduleMeasure()
+
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+      window.removeEventListener('resize', scheduleMeasure)
+      scrollContainer.removeEventListener('scroll', scheduleMeasure)
+    }
+  }, [boardLayoutKey, state.activeDeviceIds])
 
   function toggleDevice(deviceId: string) {
     const result = toggleBoardDevice(selectionRef.current, deviceId)
@@ -101,7 +176,7 @@ export function App() {
             </p>
           </div>
 
-          <div className="viewport-board-scroll">
+          <div className="viewport-board-scroll" ref={boardScrollRef}>
             <div className="viewport-board">
               {activeDevices.map((device) => (
                 <ViewportCard
@@ -109,7 +184,7 @@ export function App() {
                   device={device}
                   scale={state.viewportScales[device.id] ?? 1}
                   removable={activeDevices.length > 1}
-                  layoutRevision={boardLayoutRevision}
+                  clipped={clippedDeviceIds.has(device.id)}
                   onRemove={() => toggleDevice(device.id)}
                 />
               ))}
@@ -135,4 +210,13 @@ function readSavedDeviceIds(): string[] {
   } catch {
     return [...DEFAULT_DEVICE_IDS]
   }
+}
+
+
+function sameStringSet(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+  if (left.size !== right.size) return false
+  for (const value of left) {
+    if (!right.has(value)) return false
+  }
+  return true
 }

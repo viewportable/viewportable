@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 import type {
+  BoardLayoutSnapshot,
   BrowserCommand,
   BrowserState,
   SaveRecordingRequest,
@@ -11,6 +12,7 @@ import type {
 export type ViewportableApi = {
   command(command: BrowserCommand): void
   setViewportBounds(bounds: ViewportBounds): void
+  setBoardLayout(layout: BoardLayoutSnapshot): void
   onBrowserState(listener: (state: BrowserState) => void): () => void
   saveRecording(recording: SaveRecordingRequest): Promise<SaveRecordingResult>
 }
@@ -21,6 +23,9 @@ const api: ViewportableApi = {
   },
   setViewportBounds(bounds) {
     ipcRenderer.send(IPC.bounds, bounds)
+  },
+  setBoardLayout(layout) {
+    ipcRenderer.send(IPC.boardLayout, layout)
   },
   saveRecording(recording) {
     return ipcRenderer.invoke(IPC.saveRecording, recording) as Promise<SaveRecordingResult>

@@ -12,6 +12,7 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { DEFAULT_DEVICES } from '../shared/device'
 import {
+  BoardLayoutSnapshotSchema,
   BrowserCommandSchema,
   BrowserStateSchema,
   IPC,
@@ -239,6 +240,25 @@ ipcMain.handle(IPC.saveRecording, async (event, payload: unknown) => {
 
   await writeFile(result.filePath, Buffer.from(recording.bytes))
   return { status: 'saved' } as const
+})
+
+ipcMain.on(IPC.boardLayout, (_event, payload: unknown) => {
+  const manager = viewportManager
+  if (!manager) return
+
+  const snapshot = BoardLayoutSnapshotSchema.parse(payload)
+  manager.setBoardLayout(
+    snapshot.revision,
+    snapshot.viewports.map(({ viewportId, rect }) => ({
+      viewportId,
+      rect: {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      },
+    })),
+  )
 })
 
 ipcMain.on(IPC.bounds, (_event, payload: unknown) => {
