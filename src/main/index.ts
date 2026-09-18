@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DEVICES } from '../shared/device'
 import { BrowserCommandSchema, BrowserStateSchema, IPC, ViewportBoundsSchema } from '../shared/ipc'
@@ -14,9 +15,18 @@ function traceStartup(message: string): void {
   }
 }
 
-function exitSelfTest(code: number): never {
-  console.error(`[viewportable:self-test] exiting with code ${code}`)
-  process.exit(code)
+function reportSelfTest(status: 'pass' | 'fail', error?: unknown): void {
+  const resultFile = process.env.VIEWPORTABLE_SELF_TEST_RESULT_FILE
+  const payload = {
+    status,
+    error: error instanceof Error ? error.stack ?? error.message : error ? String(error) : null,
+  }
+
+  if (resultFile) {
+    writeFileSync(resultFile, JSON.stringify(payload), 'utf8')
+  }
+
+  console.error(`[viewportable:self-test] result:${status}`)
 }
 
 function createWindow(): BrowserWindow {
@@ -60,10 +70,10 @@ function createWindow(): BrowserWindow {
   if (process.env.VIEWPORTABLE_SELF_TEST === '1') {
     window.webContents.once('did-finish-load', () => {
       void runElectronSelfTest(window, manager, initialUrl)
-        .then(() => exitSelfTest(0))
+        .then(() => reportSelfTest('pass'))
         .catch((error: unknown) => {
           console.error('[viewportable:self-test] FAIL', error)
-          exitSelfTest(1)
+          reportSelfTest('fail', error)
         })
     })
   }
