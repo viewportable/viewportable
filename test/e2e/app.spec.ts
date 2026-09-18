@@ -31,12 +31,16 @@ test.beforeAll(async () => {
   origin = `http://127.0.0.1:${address.port}`
 
   app = await electron.launch({
-    args: ['.'],
+    args: ['--disable-gpu', '--disable-dev-shm-usage', '.'],
     cwd: process.cwd(),
     env: {
       ...process.env,
       VIEWPORTABLE_DEFAULT_URL: origin,
     },
+  })
+
+  app.process().on('exit', (code, signal) => {
+    console.error(`[e2e] Electron exited: code=${String(code)} signal=${String(signal)}`)
   })
 })
 

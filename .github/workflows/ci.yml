@@ -57,5 +57,5 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build app
         run: npm run build:app
-      - name: Run Electron E2E under Xvfb
-        run: xvfb-run --auto-servernum npm run test:e2e
+      - name: Run Electron E2E with D-Bus and Xvfb
+        run: dbus-run-session -- xvfb-run --auto-servernum --server-args="-screen 0 1440x1000x24" npm run test:e2e
