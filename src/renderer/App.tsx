@@ -55,8 +55,10 @@ export function App() {
     const scrollContainer = boardScrollRef.current
     if (!scrollContainer) return
 
+    const deviceIds = boardLayoutKey ? boardLayoutKey.split('|') : []
+
     const pendingDeviceId = pendingRevealRef.current
-    if (pendingDeviceId && state.activeDeviceIds.includes(pendingDeviceId)) {
+    if (pendingDeviceId && deviceIds.includes(pendingDeviceId)) {
       const card = scrollContainer.querySelector<HTMLElement>(
         `[data-device-card-id="${pendingDeviceId}"]`,
       )
@@ -64,7 +66,7 @@ export function App() {
       pendingRevealRef.current = null
     }
 
-    const hosts = state.activeDeviceIds
+    const hosts = deviceIds
       .map((deviceId) =>
         scrollContainer.querySelector<HTMLElement>(`[data-viewport-id="${deviceId}"]`),
       )
@@ -134,7 +136,7 @@ export function App() {
       window.removeEventListener('resize', scheduleMeasure)
       scrollContainer.removeEventListener('scroll', scheduleMeasure)
     }
-  }, [boardLayoutKey, state.activeDeviceIds])
+  }, [boardLayoutKey])
 
   function toggleDevice(deviceId: string) {
     const result = toggleBoardDevice(selectionRef.current, deviceId)
