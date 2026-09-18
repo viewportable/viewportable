@@ -1,0 +1,44 @@
+{
+  "name": "viewportable",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A responsive development browser built on Electron WebContentsView",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build:app": "electron-vite build",
+    "build": "npm run typecheck && npm run build:app",
+    "fmt": "oxfmt --write .",
+    "fmt:check": "oxfmt --check .",
+    "lint": "oxlint --deny-warnings src test electron.vite.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run test/unit",
+    "test:e2e": "playwright test -c playwright.config.ts",
+    "check:fast": "npm run fmt:check && npm run lint && npm run typecheck && npm run test:unit && npm run build:app",
+    "check": "npm run check:fast && npm run test:e2e"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "electron": "44.4.2",
+    "electron-vite": "5.0.0",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.0",
+    "vitest": "5.0.1",
+    "playwright": "1.63.0"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}

@@ -1,0 +1,279 @@
+:root {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  color: #f5f7fa;
+  background: #0b0d10;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  background:
+    radial-gradient(circle at 50% -30%, rgb(255 255 255 / 7%), transparent 42%),
+    #0b0d10;
+}
+
+.toolbar {
+  display: grid;
+  flex: 0 0 58px;
+  grid-template-columns: auto auto minmax(240px, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #242931;
+  background: rgb(12 14 17 / 96%);
+  -webkit-app-region: drag;
+}
+
+.toolbar button,
+.toolbar input,
+.address-form {
+  -webkit-app-region: no-drag;
+}
+
+.brand {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-width: 154px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brand-mark {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid #545c68;
+  font-size: 15px;
+}
+
+.navigation {
+  display: flex;
+  gap: 5px;
+}
+
+.icon-button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #2b313a;
+  border-radius: 7px;
+  background: #14181e;
+  cursor: pointer;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: #1d232b;
+}
+
+.icon-button:disabled {
+  color: #555d68;
+  cursor: default;
+}
+
+.address-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #303640;
+  border-radius: 8px;
+  background: #11151a;
+}
+
+.address-form:focus-within {
+  border-color: #616a78;
+  box-shadow: 0 0 0 1px #616a78;
+}
+
+.address-form input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: #eef1f5;
+  background: transparent;
+  font-size: 12px;
+}
+
+.secure-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #7c8592;
+}
+
+.toolbar-meta {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.mode-pill,
+.engine-pill {
+  padding: 6px 8px;
+  border: 1px solid #2c323b;
+  border-radius: 999px;
+  color: #aab1bb;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.mode-pill {
+  color: #f2f4f7;
+  background: #1a1f26;
+}
+
+.error-banner {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border-bottom: 1px solid #563638;
+  color: #ffb9bd;
+  background: #261517;
+  font-size: 11px;
+}
+
+.workspace {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+  min-height: 0;
+  padding: 18px;
+}
+
+.workspace-heading {
+  display: flex;
+  gap: 24px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.eyebrow {
+  margin: 0 0 5px;
+  color: #707987;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+
+.workspace-note {
+  max-width: 560px;
+  margin: 0;
+  color: #737c88;
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.viewport-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  min-height: 0;
+}
+
+.viewport-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #262c34;
+  border-radius: 10px;
+  background: #0e1115;
+}
+
+.viewport-header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 54px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #252a31;
+  background: #12161b;
+}
+
+.viewport-header > div,
+.viewport-meta {
+  display: flex;
+  gap: 4px;
+  flex-direction: column;
+}
+
+.viewport-header strong {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.viewport-header span {
+  color: #707987;
+  font-size: 9px;
+}
+
+.viewport-meta {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.viewport-host {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background:
+    linear-gradient(45deg, #0d1014 25%, transparent 25%) 0 0 / 12px 12px,
+    linear-gradient(-45deg, #0d1014 25%, transparent 25%) 0 0 / 12px 12px,
+    #10141a;
+}
+
+@media (max-width: 1050px) {
+  .toolbar-meta,
+  .workspace-note {
+    display: none;
+  }
+
+  .toolbar {
+    grid-template-columns: auto auto minmax(180px, 1fr);
+  }
+}

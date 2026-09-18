@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  public:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fast:
+    if: github.event_name == 'workflow_dispatch' || github.event.repository.visibility == 'public'
+    name: Fast checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.20.0
+          package-manager-cache: false
+      - name: Install dependencies without heavyweight binaries
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Format
+        run: npm run fmt:check
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Build
+        run: npm run build:app
+
+  electron-e2e:
+    if: github.event_name == 'workflow_dispatch' || github.event.repository.visibility == 'public'
+    name: Electron E2E
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.20.0
+          package-manager-cache: false
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build app
+        run: npm run build:app
+      - name: Run Electron E2E under Xvfb
+        run: xvfb-run --auto-servernum npm run test:e2e
