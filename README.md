@@ -6,6 +6,7 @@ Viewportable renders real Chromium-backed viewports side by side and keeps logic
 
 - [Product vision and competitive matrix](docs/rfc/vision.md)
 - [Roadmap](docs/roadmap.md)
+- [Monetization and feature tiers](docs/features/monetization.md)
 
 ## Current vertical slice
 
