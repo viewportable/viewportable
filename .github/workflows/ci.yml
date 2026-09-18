@@ -57,7 +57,5 @@ jobs:
           package-manager-cache: false
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build app
-        run: npm run build:app
       - name: Run native Electron integration test
         run: npm run test:electron

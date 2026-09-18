@@ -15,9 +15,9 @@
     "test": "npm run test:unit && npm run test:component",
     "test:unit": "vitest run test/unit",
     "test:component": "vitest run test/component",
-    "test:electron": "node scripts/electron-self-test.mjs",
-    "test:e2e": "playwright test -c playwright.config.ts",
-    "test:e2e:ui": "playwright test -c playwright.config.ts --ui",
+    "test:electron": "npm run build:app && node scripts/electron-self-test.mjs",
+    "test:e2e": "npm run build:app && playwright test -c playwright.config.ts",
+    "test:e2e:ui": "npm run build:app && playwright test -c playwright.config.ts --ui",
     "check:fast": "npm run lint && npm run typecheck && npm run test && npm run build:app",
     "check": "npm run check:fast && npm run test:electron"
   },
