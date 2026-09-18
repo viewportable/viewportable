@@ -84,6 +84,12 @@ export class ViewportManager {
       }
 
       this.#viewports.set(device.id, managed)
+
+      // A native WebContentsView is layered above the BrowserWindow renderer.
+      // Keep it invisible until React reports the exact placeholder bounds.
+      view.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+      view.setVisible(false)
+
       traceStartup(`${device.id}:add-child:start`)
       window.contentView.addChildView(view)
       traceStartup(`${device.id}:add-child:done`)
@@ -159,6 +165,20 @@ export class ViewportManager {
         console.warn(`[viewportable] Metrics update failed for ${managed.device.name}`, error)
       })
     }
+  }
+
+  inspectLayout(): Array<{
+    id: string
+    visible: boolean
+    area: Rectangle | null
+    bounds: Rectangle
+  }> {
+    return [...this.#viewports.values()].map(({ id, view, lastArea }) => ({
+      id,
+      visible: view.getVisible(),
+      area: lastArea,
+      bounds: view.getBounds(),
+    }))
   }
 
   async inspectProfiles(): Promise<ViewportRuntimeProfile[]> {

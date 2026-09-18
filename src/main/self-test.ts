@@ -11,7 +11,19 @@ export async function runElectronSelfTest(
   manager: ViewportManager,
   expectedUrlPrefix: string,
 ): Promise<void> {
+  await waitForShell(window)
+
   const before = await waitForExpectedProfiles(manager, expectedUrlPrefix)
+  const layout = manager.inspectLayout()
+
+  assert.equal(layout.length, DEVICES.length)
+  for (const viewport of layout) {
+    assert.ok(viewport.area, `${viewport.id}: React did not report placeholder bounds`)
+    assert.equal(viewport.visible, true, `${viewport.id}: native viewport is not visible`)
+    assert.ok(viewport.bounds.width > 0, `${viewport.id}: native viewport width is zero`)
+    assert.ok(viewport.bounds.height > 0, `${viewport.id}: native viewport height is zero`)
+    assert.ok(viewport.bounds.y > 50, `${viewport.id}: native viewport overlaps app toolbar`)
+  }
 
   const expectedWidths = DEVICES.map((device) => device.css.width).sort((a, b) => a - b)
   const expectedDprs = DEVICES.map((device) => device.dpr).sort((a, b) => a - b)
@@ -44,6 +56,22 @@ export async function runElectronSelfTest(
 
   console.log('[viewportable:self-test] profiles', JSON.stringify(before))
   console.log('[viewportable:self-test] PASS')
+}
+
+async function waitForShell(window: BrowserWindow): Promise<void> {
+  const deadline = Date.now() + TIMEOUT_MS
+
+  while (Date.now() < deadline) {
+    const shell = (await window.webContents.executeJavaScript(`({
+      text: document.body.innerText,
+      hasApi: typeof window.viewportable === 'object'
+    })`)) as { text: string; hasApi: boolean }
+
+    if (shell.text.includes('Two real Chromium viewports') && shell.hasApi) return
+    await delay(POLL_INTERVAL_MS)
+  }
+
+  throw new Error('Timed out waiting for the React shell and preload API')
 }
 
 async function waitForExpectedProfiles(

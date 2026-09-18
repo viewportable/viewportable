@@ -55,6 +55,12 @@ function createWindow(): BrowserWindow {
     if (modifier && ['+', '=', '-', '0'].includes(input.key)) event.preventDefault()
   })
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  window.webContents.on('preload-error', (_event, preloadPath, error) => {
+    console.error('[viewportable] preload error', preloadPath, error)
+  })
+  window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedUrl) => {
+    console.error('[viewportable] shell load failed', errorCode, errorDescription, validatedUrl)
+  })
 
   traceStartup('viewport-manager:create:start')
   const manager = new ViewportManager(window, DEVICES, (state) => {
