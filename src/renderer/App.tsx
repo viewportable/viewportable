@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   DEFAULT_DEVICE_IDS,
   getDeviceById,
@@ -25,16 +25,35 @@ const INITIAL_STATE: BrowserState = {
 
 export function App() {
   const [state, setState] = useState<BrowserState>(INITIAL_STATE)
+  const selectionRef = useRef<string[]>([...INITIAL_STATE.activeDeviceIds])
+  const pendingRevealRef = useRef<string | null>(null)
 
   useEffect(() => {
-    const unsubscribe = window.viewportable.onBrowserState(setState)
+    const unsubscribe = window.viewportable.onBrowserState((nextState) => {
+      selectionRef.current = [...nextState.activeDeviceIds]
+      setState(nextState)
+    })
     window.viewportable.command({ type: 'sync-state' })
 
     const saved = readSavedDeviceIds()
+    selectionRef.current = [...saved]
     window.viewportable.command({ type: 'set-devices', deviceIds: saved })
 
     return unsubscribe
   }, [])
+
+  useEffect(() => {
+    const deviceId = pendingRevealRef.current
+    if (!deviceId || !state.activeDeviceIds.includes(deviceId)) return
+
+    const frame = requestAnimationFrame(() => {
+      const card = document.querySelector<HTMLElement>(`[data-device-card-id="${deviceId}"]`)
+      card?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' })
+      pendingRevealRef.current = null
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [state.activeDeviceIds])
 
   const activeDevices = useMemo(
     () =>
@@ -45,15 +64,17 @@ export function App() {
   )
 
   function toggleDevice(deviceId: string) {
-    const isActive = state.activeDeviceIds.includes(deviceId)
+    const current = selectionRef.current
+    const isActive = current.includes(deviceId)
 
-    if (isActive && state.activeDeviceIds.length === 1) return
+    if (isActive && current.length === 1) return
 
-    const next = isActive
-      ? state.activeDeviceIds.filter((id) => id !== deviceId)
-      : [...state.activeDeviceIds, deviceId]
-
+    const next = isActive ? current.filter((id) => id !== deviceId) : [...current, deviceId]
     const resolved = resolveDeviceSelection(next).map((device) => device.id).slice(0, 6)
+
+    selectionRef.current = [...resolved]
+    if (!isActive) pendingRevealRef.current = deviceId
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(resolved))
     window.viewportable.command({ type: 'set-devices', deviceIds: resolved })
   }

@@ -67,7 +67,7 @@ export function ViewportCard({ device, scale, removable, onRemove }: Props) {
   }, [device])
 
   return (
-    <section className="viewport-card">
+    <section className="viewport-card" data-device-card-id={device.id}>
       <div className="viewport-header">
         <div>
           <strong>{device.name}</strong>

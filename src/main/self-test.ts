@@ -79,6 +79,16 @@ export async function runElectronSelfTest(
   await waitForExpectedProfiles(manager, expectedUrlPrefix, DEFAULT_DEVICES)
   assert.equal(manager.inspectLayout().length, DEFAULT_DEVICES.length, 'Dynamic device remove failed')
 
+  await manager.setDevices(expandedIds)
+  const readded = await waitForExpectedProfiles(manager, expectedUrlPrefix, expandedDevices)
+  assert.ok(
+    readded.some((profile) => profile.id === 'compact-phone' && profile.innerWidth === 360),
+    'Removed device did not reappear after being added again',
+  )
+
+  await manager.setDevices(DEFAULT_DEVICE_IDS)
+  await waitForExpectedProfiles(manager, expectedUrlPrefix, DEFAULT_DEVICES)
+
   window.setSize(1000, 680)
   await delay(400)
 

@@ -131,9 +131,8 @@ export class ViewportManager {
     const nextIds = devices.map((device) => device.id)
     const nextSet = new Set(nextIds)
 
-    for (const id of this.#viewportOrder) {
-      if (!nextSet.has(id)) this.#removeViewport(id)
-    }
+    const idsToRemove = this.#viewportOrder.filter((id) => !nextSet.has(id))
+    for (const id of idsToRemove) this.#removeViewport(id)
 
     const loads: Promise<void>[] = []
 
@@ -211,7 +210,9 @@ export class ViewportManager {
   }
 
   destroy(): void {
-    for (const id of this.#viewportOrder) {
+    while (this.#viewportOrder.length > 0) {
+      const id = this.#viewportOrder[0]
+      if (!id) break
       this.#removeViewport(id)
     }
 
