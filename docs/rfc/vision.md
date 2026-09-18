@@ -111,7 +111,7 @@ Legend: ✅ available, ◐ partial/basic, — not a primary capability, 🧭 pla
 | Navigation sync | ✅ common URL | ✅ configurable | ✅ | ✅ | ✅ | ✅ | — |
 | Per-pane independent URL | — | 🧭 | ◐ | ? | ✅ | ? | n/a |
 | Screenshots | — | 🧭 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Recording | — | possible later | ✅ | ? | ◐ | ✅ | — |
+| Recording | — | 🧭 board + selected viewport | ✅ | ? | ◐ | ✅ | — |
 | Breakpoint discovery/generation | — | 🧭 | ? | ? | ✅ | ? | ◐ |
 | Accessibility audit | — | later | ? | ? | ✅ strong | ? | ✅ |
 | Responsive overflow diagnostics | — | 🧭 Slice | ? | ? | ✅ debug tooling | ? | ◐ |
@@ -127,6 +127,8 @@ Sizzy, Responsively and Blisk represent mature multi-device workflows that Viewp
 Chrome DevTools remains the reference for low-level Chromium debugging, network/performance tooling and single-viewport device emulation.
 
 Viewportable's intended differentiation is the combination of Proportional scale, calibrated True 1:1, deterministic Slice diagnostics and a reusable automation-friendly core.
+
+Screen recording is a planned developer-tool capability. The implementation must be explicit about capture scope: whole Device Board versus selected viewport. The recording path must capture the real native `WebContentsView` composition rather than only the React shell.
 
 ## Official sources
 

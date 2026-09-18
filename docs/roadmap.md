@@ -81,6 +81,10 @@ Integrate Slice as a separate diagnostics layer rather than coupling it to the E
 - [ ] Chromium DevTools entry point per viewport.
 - [ ] Screenshot single viewport.
 - [ ] Screenshot whole board.
+- [ ] Record selected viewport.
+- [ ] Record whole Device Board, including native `WebContentsView` content.
+- [ ] Recording controls: start/stop, elapsed time, save/export.
+- [ ] Decide cursor/audio behavior after reviewing real usage video.
 - [ ] Breakpoint discovery from page CSS.
 - [ ] Relevant media/user preference emulation.
 - [ ] Network throttling where useful.
