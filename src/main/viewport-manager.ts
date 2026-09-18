@@ -10,6 +10,7 @@ export type ManagedViewport = {
   view: WebContentsView
   lastArea: Rectangle | null
   resolvedScale: number
+  pageReady: boolean
 }
 
 export type ViewportRuntimeProfile = {
@@ -68,7 +69,6 @@ export class ViewportManager {
           sandbox: true,
         },
       })
-
       traceStartup(`${device.id}:new-view:done`)
 
       const managed: ManagedViewport = {
@@ -78,6 +78,7 @@ export class ViewportManager {
         view,
         lastArea: null,
         resolvedScale: 1,
+        pageReady: false,
       }
 
       this.#viewports.set(device.id, managed)
@@ -98,6 +99,9 @@ export class ViewportManager {
     const url = normalizeUrl(value)
     traceStartup(`navigate:start:${url}`)
     this.#lastError = null
+
+    for (const managed of this.#viewports.values()) managed.pageReady = false
+
     await Promise.allSettled([...this.#viewports.values()].map(({ view }) => view.webContents.loadURL(url)))
     traceStartup(`navigate:done:${url}`)
     this.#emitPrimaryState()
@@ -120,7 +124,10 @@ export class ViewportManager {
   }
 
   reload(): void {
-    for (const { view } of this.#viewports.values()) view.webContents.reload()
+    for (const managed of this.#viewports.values()) {
+      managed.pageReady = false
+      managed.view.webContents.reload()
+    }
   }
 
   emitState(): void {
@@ -144,16 +151,10 @@ export class ViewportManager {
     const y = Math.round(area.y + Math.max(0, (area.height - size.height) / 2))
 
     managed.resolvedScale = scale
-    managed.view.webContents.enableDeviceEmulation({
-      screenPosition: 'mobile',
-      screenSize: managed.device.css,
-      viewSize: managed.device.css,
-      viewPosition: { x: 0, y: 0 },
-      deviceScaleFactor: managed.device.dpr,
-      scale,
-    })
     managed.view.setBounds({ x, y, width: size.width, height: size.height })
     managed.view.setVisible(true)
+
+    if (managed.pageReady) this.#applyDeviceMetrics(managed)
   }
 
   async inspectProfiles(): Promise<ViewportRuntimeProfile[]> {
@@ -193,26 +194,14 @@ export class ViewportManager {
 
     contents.setUserAgent(browser.userAgent)
     traceStartup(`${device.id}:user-agent:done`)
+
     contents.on('before-input-event', (event, input) => {
       const modifier = process.platform === 'darwin' ? input.meta : input.control
       if (modifier && ['+', '=', '-', '0'].includes(input.key)) event.preventDefault()
     })
-    traceStartup(`${device.id}:device-emulation:start`)
-    contents.enableDeviceEmulation({
-      screenPosition: 'mobile',
-      screenSize: device.css,
-      viewSize: device.css,
-      viewPosition: { x: 0, y: 0 },
-      deviceScaleFactor: device.dpr,
-      scale: 1,
-    })
-    traceStartup(`${device.id}:device-emulation:done`)
 
     if (process.env.VIEWPORTABLE_DISABLE_CDP_EMULATION !== '1') {
-      traceStartup(`${device.id}:cdp:start`)
-      this.#enableTouchEmulation(managed).catch((error: unknown) => {
-        console.warn(`[viewportable] Touch emulation unavailable for ${device.name}`, error)
-      })
+      traceStartup(`${device.id}:cdp:deferred-until-load`)
     }
 
     traceStartup(`${device.id}:handlers:start`)
@@ -225,10 +214,30 @@ export class ViewportManager {
       if (managed.id === this.#primaryId) this.#emitPrimaryState()
     }
 
-    contents.on('did-start-loading', emit)
+    contents.on('did-start-loading', () => {
+      managed.pageReady = false
+      emit()
+    })
     contents.on('did-stop-loading', emit)
     contents.on('did-navigate', emit)
     contents.on('did-navigate-in-page', emit)
+    contents.on('did-finish-load', () => {
+      managed.pageReady = true
+      traceStartup(`${device.id}:did-finish-load`)
+
+      try {
+        this.#applyDeviceMetrics(managed)
+      } catch (error) {
+        console.error(`[viewportable] Device emulation failed for ${device.name}`, error)
+        return
+      }
+
+      if (process.env.VIEWPORTABLE_DISABLE_CDP_EMULATION !== '1') {
+        void this.#enableTouchEmulation(managed).catch((error: unknown) => {
+          console.warn(`[viewportable] Touch emulation unavailable for ${device.name}`, error)
+        })
+      }
+    })
     contents.on('did-fail-load', (_event, errorCode, errorDescription, validatedUrl, isMainFrame) => {
       if (!isMainFrame || errorCode === -3) return
       if (managed.id === this.#primaryId) {
@@ -239,10 +248,24 @@ export class ViewportManager {
     traceStartup(`${device.id}:handlers:done`)
   }
 
+  #applyDeviceMetrics(managed: ManagedViewport): void {
+    traceStartup(`${managed.id}:device-emulation:start`)
+    managed.view.webContents.enableDeviceEmulation({
+      screenPosition: 'mobile',
+      screenSize: managed.device.css,
+      viewSize: managed.device.css,
+      viewPosition: { x: 0, y: 0 },
+      deviceScaleFactor: managed.device.dpr,
+      scale: managed.resolvedScale,
+    })
+    traceStartup(`${managed.id}:device-emulation:done`)
+  }
+
   async #enableTouchEmulation(managed: ManagedViewport): Promise<void> {
     if (!managed.browser.touch) return
 
     const debuggerApi = managed.view.webContents.debugger
+    traceStartup(`${managed.id}:cdp:start`)
     if (!debuggerApi.isAttached()) debuggerApi.attach('1.3')
     traceStartup(`${managed.id}:cdp:attached`)
 
@@ -251,6 +274,7 @@ export class ViewportManager {
       maxTouchPoints: managed.browser.maxTouchPoints,
     })
     traceStartup(`${managed.id}:cdp:touch:done`)
+
     await debuggerApi.sendCommand('Emulation.setEmulatedMedia', {
       features: [
         { name: 'pointer', value: 'coarse' },
