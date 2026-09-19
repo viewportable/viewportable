@@ -452,7 +452,9 @@ export class ViewportManager {
             const selector = ${selectorLiteral}
             const target = selector
               ? Array.from(document.querySelectorAll(selector)).find(
-                  (element) => getComputedStyle(element).display !== 'none',
+                  (element) =>
+                    element.clientHeight > 0 &&
+                    element.scrollHeight - element.clientHeight > 1,
                 ) ?? null
               : null
 
@@ -490,7 +492,9 @@ export class ViewportManager {
         const selector = ${selectorLiteral}
         const target = selector
           ? Array.from(document.querySelectorAll(selector)).find(
-              (element) => getComputedStyle(element).display !== 'none',
+              (element) =>
+                element.clientHeight > 0 &&
+                element.scrollHeight - element.clientHeight > 1,
             ) ?? null
           : null
 
