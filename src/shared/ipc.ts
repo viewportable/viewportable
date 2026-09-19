@@ -24,6 +24,10 @@ export const BrowserCommandSchema = z.discriminatedUnion('type', [
     viewportId: z.string().min(1),
     deltaY: z.number().finite(),
   }),
+  z.object({
+    type: z.literal('scroll-all-viewports'),
+    deltaY: z.number().finite(),
+  }),
   z.object({ type: z.literal('set-devices'), deviceIds: DeviceIdsSchema }),
 ])
 
