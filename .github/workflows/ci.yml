@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   fast:
-    if: github.event_name == 'workflow_dispatch' || github.event.repository.visibility == 'public'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.repository.visibility == 'public'
     name: Fast checks
     runs-on: ubuntu-latest
     timeout-minutes: 8
