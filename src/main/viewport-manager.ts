@@ -5,6 +5,7 @@ import {
   type Rectangle,
 } from 'electron'
 import { planBoardReconcile, resolveBoardDevices } from '../core/board'
+import { resolveBoardScrollDelta } from '../core/board-scroll'
 import { resolveViewportLayouts } from '../core/layout'
 import {
   MOBILE_CHROMIUM_PROFILE,
@@ -421,14 +422,12 @@ export class ViewportManager {
       if (mouse.type !== 'mouseWheel') return
 
       const wheel = mouse as MouseWheelInputEvent
-      const deltaX = wheel.deltaX ?? 0
-      const deltaY = wheel.deltaY ?? 0
-      const shift = wheel.modifiers?.includes('shift') ?? false
-      const horizontalGesture = shift || Math.abs(deltaX) > Math.abs(deltaY)
-      if (!horizontalGesture) return
-
-      const routedDelta = shift && Math.abs(deltaX) <= Math.abs(deltaY) ? deltaY : deltaX
-      if (Math.abs(routedDelta) < 0.01) return
+      const routedDelta = resolveBoardScrollDelta({
+        deltaX: wheel.deltaX ?? 0,
+        deltaY: wheel.deltaY ?? 0,
+        shift: wheel.modifiers?.includes('shift') ?? false,
+      })
+      if (routedDelta === null) return
 
       event.preventDefault()
 
