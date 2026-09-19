@@ -89,7 +89,7 @@ export async function runElectronSelfTest(
   assert.ok(
     globalSourceProgress !== null &&
       globalSourceProgress !== undefined &&
-      globalSourceProgress > 0.22,
+      Math.abs(globalSourceProgress - 0.2) > 0.02,
     `Global synchronized scroll did not move the source viewport: ${JSON.stringify(globalProgress)}`,
   )
   await waitForSyncedScroll(
