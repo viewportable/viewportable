@@ -69,7 +69,10 @@ export async function runElectronSelfTest(
 
   await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2, scrollFixture)
   await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.2, scrollFixture)
+  window.show()
   window.focus()
+  await delay(150)
+
   window.webContents.sendInputEvent({
     type: 'mouseWheel',
     x: 40,
