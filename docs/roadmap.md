@@ -24,6 +24,7 @@ Exit criterion: board selection, ordering, scaling and sync state can be tested 
 - [x] Coalesce native viewport layout updates to one commit per frame and skip unchanged bounds/CDP metrics.
 - [x] Send one transactional board-layout snapshot from React to Electron instead of per-card bounds IPC.
 - [x] Route horizontal trackpad / Shift+wheel gestures over native viewports to the Device Board while preserving vertical page scroll.
+- [x] Treat the full viewport card body as a vertical scroll zone by proxying gutter wheel gestures into that device.
 - [ ] Preserve selected/revealed device during board changes.
 - [ ] Add clear loading/error states per viewport.
 - [ ] Add keyboard navigation across devices.

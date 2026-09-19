@@ -67,6 +67,26 @@ export async function runElectronSelfTest(
   await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.6, scrollFixture)
   await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.6, scrollFixture)
 
+  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2, scrollFixture)
+  await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.2, scrollFixture)
+  await manager.scrollViewportByDelta(DEFAULT_DEVICE_IDS[0], 400)
+  await delay(200)
+
+  const gutterProgress = await manager.inspectScrollProgress(scrollFixture)
+  const gutterSourceProgress = gutterProgress[DEFAULT_DEVICE_IDS[0]]
+  assert.ok(
+    gutterSourceProgress !== null &&
+      gutterSourceProgress !== undefined &&
+      gutterSourceProgress > 0.22,
+    `Gutter scroll proxy did not move the source viewport: ${JSON.stringify(gutterProgress)}`,
+  )
+  await waitForSyncedScroll(
+    manager,
+    DEFAULT_DEVICE_IDS,
+    gutterSourceProgress,
+    scrollFixture,
+  )
+
   manager.setSyncScrollEnabled(false)
   await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2, scrollFixture)
   await delay(300)
@@ -77,7 +97,7 @@ export async function runElectronSelfTest(
     'Source viewport did not move after disabling scroll sync',
   )
   assert.ok(
-    Math.abs((unsyncedProgress[DEFAULT_DEVICE_IDS[1]] ?? 0) - 0.6) < 0.03,
+    Math.abs((unsyncedProgress[DEFAULT_DEVICE_IDS[1]] ?? 0) - gutterSourceProgress) < 0.03,
     'Target viewport moved while scroll sync was disabled',
   )
 
