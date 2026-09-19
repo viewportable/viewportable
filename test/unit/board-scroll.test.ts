@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { resolveBoardScrollDelta } from '../../src/core/board-scroll'
+import {
+  resolveBoardScrollDelta,
+  resolveViewportScrollDelta,
+} from '../../src/core/board-scroll'
 
 describe('board scroll routing', () => {
   it('routes a horizontal trackpad gesture to the board', () => {
@@ -16,5 +19,39 @@ describe('board scroll routing', () => {
 
   it('ignores zero-length gestures', () => {
     expect(resolveBoardScrollDelta({ deltaX: 0, deltaY: 0, shift: false })).toBeNull()
+  })
+
+  it('routes vertical gutter gestures to the selected viewport', () => {
+    expect(
+      resolveViewportScrollDelta({
+        deltaX: 3,
+        deltaY: 40,
+        shift: false,
+        deltaMode: 0,
+        pageHeight: 600,
+      }),
+    ).toBe(40)
+  })
+
+  it('keeps horizontal and Shift+wheel gestures out of viewport proxy scrolling', () => {
+    expect(
+      resolveViewportScrollDelta({
+        deltaX: 40,
+        deltaY: 4,
+        shift: false,
+        deltaMode: 0,
+        pageHeight: 600,
+      }),
+    ).toBeNull()
+
+    expect(
+      resolveViewportScrollDelta({
+        deltaX: 0,
+        deltaY: 40,
+        shift: true,
+        deltaMode: 0,
+        pageHeight: 600,
+      }),
+    ).toBeNull()
   })
 })

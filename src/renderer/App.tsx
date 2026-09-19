@@ -201,6 +201,13 @@ export function App() {
                   scale={state.viewportScales[device.id] ?? 1}
                   removable={activeDevices.length > 1}
                   clipped={clippedDeviceIds.has(device.id)}
+                  onScroll={(deltaY) =>
+                    window.viewportable.command({
+                      type: 'scroll-viewport',
+                      viewportId: device.id,
+                      deltaY,
+                    })
+                  }
                   onRemove={() => toggleDevice(device.id)}
                 />
               ))}

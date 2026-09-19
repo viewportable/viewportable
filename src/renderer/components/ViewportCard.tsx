@@ -1,3 +1,4 @@
+import { resolveViewportScrollDelta } from '../../core/board-scroll'
 import type { DeviceSpec } from '../../shared/device'
 
 type Props = {
@@ -5,10 +6,18 @@ type Props = {
   scale: number
   removable: boolean
   clipped: boolean
+  onScroll(deltaY: number): void
   onRemove(): void
 }
 
-export function ViewportCard({ device, scale, removable, clipped, onRemove }: Props) {
+export function ViewportCard({
+  device,
+  scale,
+  removable,
+  clipped,
+  onScroll,
+  onRemove,
+}: Props) {
   return (
     <section
       className="viewport-card"
@@ -41,7 +50,22 @@ export function ViewportCard({ device, scale, removable, clipped, onRemove }: Pr
         </div>
       </div>
 
-      <div className="viewport-host" data-viewport-id={device.id}>
+      <div
+        className="viewport-host"
+        data-viewport-id={device.id}
+        data-testid={`viewport-scroll-zone-${device.id}`}
+        onWheel={(event) => {
+          const deltaY = resolveViewportScrollDelta({
+            deltaX: event.deltaX,
+            deltaY: event.deltaY,
+            shift: event.shiftKey,
+            deltaMode: event.deltaMode,
+            pageHeight: event.currentTarget.clientHeight,
+          })
+
+          if (deltaY !== null) onScroll(deltaY)
+        }}
+      >
         {clipped ? (
           <span className="viewport-clipped-hint">Scroll to reveal viewport</span>
         ) : null}
