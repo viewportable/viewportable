@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   resolveBoardScrollDelta,
-  resolveSynchronizedScrollDelta,
-  resolveViewportScrollDelta,
+  resolveShellScrollDelta,
 } from '../../src/core/board-scroll'
 
 describe('board scroll routing', () => {
@@ -22,9 +21,9 @@ describe('board scroll routing', () => {
     expect(resolveBoardScrollDelta({ deltaX: 0, deltaY: 0, shift: false })).toBeNull()
   })
 
-  it('routes vertical gutter gestures to the selected viewport', () => {
+  it('routes vertical shell gestures into global synchronized scrolling', () => {
     expect(
-      resolveViewportScrollDelta({
+      resolveShellScrollDelta({
         deltaX: 3,
         deltaY: 40,
         shift: false,
@@ -34,27 +33,9 @@ describe('board scroll routing', () => {
     ).toBe(40)
   })
 
-  it('routes vertical gestures into global synchronized scrolling', () => {
+  it('keeps horizontal and Shift+wheel gestures out of global vertical scrolling', () => {
     expect(
-      resolveSynchronizedScrollDelta({
-        deltaX: 2,
-        deltaY: 36,
-        shift: false,
-      }),
-    ).toBe(36)
-
-    expect(
-      resolveSynchronizedScrollDelta({
-        deltaX: 40,
-        deltaY: 4,
-        shift: false,
-      }),
-    ).toBeNull()
-  })
-
-  it('keeps horizontal and Shift+wheel gestures out of viewport proxy scrolling', () => {
-    expect(
-      resolveViewportScrollDelta({
+      resolveShellScrollDelta({
         deltaX: 40,
         deltaY: 4,
         shift: false,
@@ -64,7 +45,7 @@ describe('board scroll routing', () => {
     ).toBeNull()
 
     expect(
-      resolveViewportScrollDelta({
+      resolveShellScrollDelta({
         deltaX: 0,
         deltaY: 40,
         shift: true,
