@@ -65,6 +65,22 @@ export async function runElectronSelfTest(
   await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.6)
   await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.6)
 
+  manager.setSyncScrollEnabled(false)
+  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2)
+  await delay(300)
+
+  const unsyncedProgress = await manager.inspectScrollProgress()
+  assert.ok(
+    Math.abs((unsyncedProgress[DEFAULT_DEVICE_IDS[0]] ?? 0) - 0.2) < 0.03,
+    'Source viewport did not move after disabling scroll sync',
+  )
+  assert.ok(
+    Math.abs((unsyncedProgress[DEFAULT_DEVICE_IDS[1]] ?? 0) - 0.6) < 0.03,
+    'Target viewport moved while scroll sync was disabled',
+  )
+
+  manager.setSyncScrollEnabled(true)
+
   DEFAULT_DEVICES.forEach((device, index) => {
     manager.setAvailableBounds(device.id, {
       x: 260 + index * 520,
@@ -137,12 +153,14 @@ async function waitForShell(window: BrowserWindow): Promise<void> {
     const shell = (await window.webContents.executeJavaScript(`({
       hasAppShell: document.querySelector('.app-shell') !== null,
       hasScaleControl: document.querySelector('[aria-label="Viewport scale mode"]') !== null,
+      hasSyncScroll: document.querySelector('[aria-label="Sync scroll"]') !== null,
       hasDeviceSidebar: document.querySelector('.device-sidebar') !== null,
       hasBoard: document.querySelector('.viewport-board-scroll') !== null,
       hasApi: typeof window.viewportable === 'object'
     })`)) as {
       hasAppShell: boolean
       hasScaleControl: boolean
+      hasSyncScroll: boolean
       hasDeviceSidebar: boolean
       hasBoard: boolean
       hasApi: boolean
@@ -151,6 +169,7 @@ async function waitForShell(window: BrowserWindow): Promise<void> {
     if (
       shell.hasAppShell &&
       shell.hasScaleControl &&
+      shell.hasSyncScroll &&
       shell.hasDeviceSidebar &&
       shell.hasBoard &&
       shell.hasApi

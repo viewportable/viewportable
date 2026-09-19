@@ -37,7 +37,7 @@ First vertical slice:
 - [x] Synchronize document scroll by normalized progress.
 - [x] Prevent feedback loops.
 - [x] Handle different document heights.
-- [ ] Add deterministic integration coverage.
+- [x] Add deterministic integration coverage for sync-on and sync-off behavior.
 
 Then:
 
