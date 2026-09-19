@@ -18,6 +18,7 @@ export const BrowserCommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('reload') }),
   z.object({ type: z.literal('sync-state') }),
   z.object({ type: z.literal('set-scale-mode'), mode: z.enum(ACTIVE_SCALE_MODES) }),
+  z.object({ type: z.literal('set-sync-scroll'), enabled: z.boolean() }),
   z.object({ type: z.literal('set-devices'), deviceIds: DeviceIdsSchema }),
 ])
 
@@ -63,6 +64,7 @@ export const BrowserStateSchema = z.object({
   isLoading: z.boolean(),
   error: z.string().nullable(),
   scaleMode: z.enum(ACTIVE_SCALE_MODES),
+  syncScrollEnabled: z.boolean(),
   viewportScales: z.record(z.string(), z.number().finite().nonnegative()),
   activeDeviceIds: DeviceIdsSchema,
 })

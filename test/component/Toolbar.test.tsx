@@ -41,6 +41,7 @@ describe('Toolbar', () => {
       isLoading: false,
       error: null,
       scaleMode: 'fit',
+      syncScrollEnabled: true,
       viewportScales: {},
       activeDeviceIds: ['iphone-15-pro'],
     }
@@ -52,6 +53,49 @@ describe('Toolbar', () => {
     expect(command).toHaveBeenCalledWith({
       type: 'set-scale-mode',
       mode: 'proportional',
+    })
+  })
+
+  it('toggles synchronized scrolling', async () => {
+    const command = vi.fn()
+    const api: ViewportableApi = {
+      command,
+      setViewportBounds() {},
+      setBoardLayout() {},
+      onBoardScroll() {
+        return () => {}
+      },
+      onBrowserState() {
+        return () => {}
+      },
+      async saveRecording() {
+        return { status: 'saved' }
+      },
+    }
+
+    Object.defineProperty(window, 'viewportable', {
+      configurable: true,
+      value: api,
+    })
+
+    const state: BrowserState = {
+      url: 'https://example.com',
+      canGoBack: false,
+      canGoForward: false,
+      isLoading: false,
+      error: null,
+      scaleMode: 'fit',
+      syncScrollEnabled: true,
+      viewportScales: {},
+      activeDeviceIds: ['iphone-15-pro'],
+    }
+
+    render(<Toolbar state={state} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Sync scroll' }))
+
+    expect(command).toHaveBeenCalledWith({
+      type: 'set-sync-scroll',
+      enabled: false,
     })
   })
 })

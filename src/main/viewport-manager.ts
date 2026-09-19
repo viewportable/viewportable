@@ -7,6 +7,7 @@ import {
 import { planBoardReconcile, resolveBoardDevices } from '../core/board'
 import { resolveBoardScrollDelta } from '../core/board-scroll'
 import { resolveViewportLayouts } from '../core/layout'
+import { normalizeScrollProgress } from '../core/sync'
 import {
   MOBILE_CHROMIUM_PROFILE,
   type BrowserProfile,
@@ -25,6 +26,7 @@ export type ManagedViewport = {
   resolvedScale: number
   pageReady: boolean
   emulationReady: boolean
+  scrollSyncBridgeReady: boolean
 }
 
 export type ViewportRuntimeProfile = {
@@ -42,6 +44,49 @@ export type ViewportRuntimeProfile = {
 
 const LAYOUT_FRAME_MS = 16
 const SCALE_EPSILON = 0.000001
+const SCROLL_SYNC_BINDING = '__viewportableReportScroll'
+const SCROLL_SYNC_INSTALL_SCRIPT = `
+(() => {
+  if (window.top !== window || window.__viewportableSyncScrollInstalled) return
+
+  window.__viewportableSyncScrollInstalled = true
+  let frame = 0
+  let suppressUntil = 0
+
+  const report = () => {
+    frame = 0
+    if (performance.now() < suppressUntil) return
+
+    const root = document.scrollingElement || document.documentElement
+    const maxScrollY = Math.max(0, root.scrollHeight - window.innerHeight)
+    if (maxScrollY <= 0) return
+
+    const progress = Math.min(1, Math.max(0, window.scrollY / maxScrollY))
+    const reportScroll = window.${SCROLL_SYNC_BINDING}
+
+    if (typeof reportScroll === 'function') {
+      reportScroll(JSON.stringify({ progress }))
+    }
+  }
+
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (frame === 0) frame = requestAnimationFrame(report)
+    },
+    { passive: true },
+  )
+
+  window.__viewportableApplySyncedScroll = (progress) => {
+    const normalized = Math.min(1, Math.max(0, Number(progress) || 0))
+    const root = document.scrollingElement || document.documentElement
+    const maxScrollY = Math.max(0, root.scrollHeight - window.innerHeight)
+
+    suppressUntil = performance.now() + 120
+    window.scrollTo({ top: maxScrollY * normalized, left: window.scrollX, behavior: 'auto' })
+  }
+})()
+`
 
 function sameRectangle(left: Rectangle | null, right: Rectangle): boolean {
   return (
@@ -66,6 +111,7 @@ type StateListener = (state: {
   isLoading: boolean
   error: string | null
   scaleMode: ActiveScaleMode
+  syncScrollEnabled: boolean
   viewportScales: Record<string, number>
   activeDeviceIds: string[]
 }) => void
@@ -78,8 +124,11 @@ export class ViewportManager {
   #viewportOrder: string[] = []
   #lastError: string | null = null
   #scaleMode: ActiveScaleMode = 'fit'
+  #syncScrollEnabled = true
   #currentUrl = 'https://example.com'
   #layoutTimer: ReturnType<typeof setTimeout> | null = null
+  #scrollSyncTimer: ReturnType<typeof setTimeout> | null = null
+  #pendingScrollSync: { sourceId: string; progress: number } | null = null
   #lastBoardLayoutRevision = -1
 
   constructor(
@@ -182,6 +231,14 @@ export class ViewportManager {
     this.#scheduleLayout()
   }
 
+  setSyncScrollEnabled(enabled: boolean): void {
+    if (this.#syncScrollEnabled === enabled) return
+
+    this.#syncScrollEnabled = enabled
+    if (!enabled) this.#cancelScrollSync()
+    this.#emitPrimaryState()
+  }
+
   emitState(): void {
     this.#emitPrimaryState()
   }
@@ -228,6 +285,38 @@ export class ViewportManager {
     }))
   }
 
+  async inspectScrollProgress(): Promise<Record<string, number | null>> {
+    const entries = await Promise.all(
+      this.#managedViewports().map(async ({ id, view }) => {
+        const progress = (await view.webContents.executeJavaScript(`
+          (() => {
+            const root = document.scrollingElement || document.documentElement
+            const maxScrollY = Math.max(0, root.scrollHeight - window.innerHeight)
+            return maxScrollY > 0 ? window.scrollY / maxScrollY : null
+          })()
+        `)) as number | null
+
+        return [id, progress] as const
+      }),
+    )
+
+    return Object.fromEntries(entries)
+  }
+
+  async scrollViewportToProgress(viewportId: string, progress: number): Promise<void> {
+    const managed = this.#viewports.get(viewportId)
+    if (!managed) throw new Error(`Unknown viewport: ${viewportId}`)
+
+    const normalized = normalizeScrollProgress(progress)
+    await managed.view.webContents.executeJavaScript(`
+      (() => {
+        const root = document.scrollingElement || document.documentElement
+        const maxScrollY = Math.max(0, root.scrollHeight - window.innerHeight)
+        window.scrollTo({ top: maxScrollY * ${normalized}, left: window.scrollX, behavior: 'auto' })
+      })()
+    `)
+  }
+
   async inspectProfiles(): Promise<ViewportRuntimeProfile[]> {
     return Promise.all(
       this.#managedViewports().map(async ({ id, view, resolvedScale }) => {
@@ -253,6 +342,7 @@ export class ViewportManager {
 
   destroy(): void {
     this.#cancelScheduledLayout()
+    this.#cancelScrollSync()
 
     while (this.#viewportOrder.length > 0) {
       const id = this.#viewportOrder[0]
@@ -295,6 +385,7 @@ export class ViewportManager {
       resolvedScale: 1,
       pageReady: false,
       emulationReady: false,
+      scrollSyncBridgeReady: false,
     }
 
     this.#viewports.set(device.id, managed)
@@ -418,6 +509,21 @@ export class ViewportManager {
       if (modifier && ['+', '=', '-', '0'].includes(input.key)) event.preventDefault()
     })
 
+    contents.debugger.on('message', (_event, method, params) => {
+      if (method !== 'Runtime.bindingCalled') return
+
+      const binding = params as { name?: unknown; payload?: unknown }
+      if (binding.name !== SCROLL_SYNC_BINDING || typeof binding.payload !== 'string') return
+
+      try {
+        const payload = JSON.parse(binding.payload) as { progress?: unknown }
+        if (typeof payload.progress !== 'number') return
+        this.#queueScrollSync(managed.id, payload.progress)
+      } catch {
+        // Ignore malformed page-to-host scroll payloads.
+      }
+    })
+
     contents.on('before-mouse-event', (event, mouse) => {
       if (mouse.type !== 'mouseWheel') return
 
@@ -484,6 +590,7 @@ export class ViewportManager {
     if (!debuggerApi.isAttached()) debuggerApi.attach('1.3')
     traceStartup(`${managed.id}:cdp:attach:done`)
 
+    await this.#installScrollSyncBridge(managed)
     await this.#applyDeviceMetrics(managed)
 
     if (managed.browser.touch) {
@@ -505,6 +612,70 @@ export class ViewportManager {
     traceStartup(`${managed.id}:cdp:media:done`)
 
     managed.emulationReady = true
+  }
+
+  async #installScrollSyncBridge(managed: ManagedViewport): Promise<void> {
+    const debuggerApi = managed.view.webContents.debugger
+    if (!debuggerApi.isAttached()) return
+
+    if (!managed.scrollSyncBridgeReady) {
+      await debuggerApi.sendCommand('Page.enable')
+      await debuggerApi.sendCommand('Runtime.addBinding', { name: SCROLL_SYNC_BINDING })
+      await debuggerApi.sendCommand('Page.addScriptToEvaluateOnNewDocument', {
+        source: SCROLL_SYNC_INSTALL_SCRIPT,
+      })
+      managed.scrollSyncBridgeReady = true
+    }
+
+    await debuggerApi.sendCommand('Runtime.evaluate', {
+      expression: SCROLL_SYNC_INSTALL_SCRIPT,
+    })
+  }
+
+  #queueScrollSync(sourceId: string, progress: number): void {
+    if (!this.#syncScrollEnabled) return
+
+    this.#pendingScrollSync = {
+      sourceId,
+      progress: normalizeScrollProgress(progress),
+    }
+
+    if (this.#scrollSyncTimer !== null) return
+
+    this.#scrollSyncTimer = setTimeout(() => {
+      this.#scrollSyncTimer = null
+      const pending = this.#pendingScrollSync
+      this.#pendingScrollSync = null
+      if (!pending || !this.#syncScrollEnabled) return
+
+      this.#applyScrollSync(pending.sourceId, pending.progress)
+    }, LAYOUT_FRAME_MS)
+  }
+
+  #cancelScrollSync(): void {
+    if (this.#scrollSyncTimer !== null) {
+      clearTimeout(this.#scrollSyncTimer)
+      this.#scrollSyncTimer = null
+    }
+
+    this.#pendingScrollSync = null
+  }
+
+  #applyScrollSync(sourceId: string, progress: number): void {
+    const expression = `window.__viewportableApplySyncedScroll?.(${progress})`
+
+    for (const managed of this.#managedViewports()) {
+      if (managed.id === sourceId || !managed.pageReady) continue
+
+      const debuggerApi = managed.view.webContents.debugger
+      if (!debuggerApi.isAttached()) continue
+
+      void debuggerApi
+        .sendCommand('Runtime.evaluate', { expression })
+        .catch((error: unknown) => {
+          console.warn(`[viewportable] Scroll sync failed for ${managed.device.name}`, error)
+        })
+    }
   }
 
   async #applyDeviceMetrics(managed: ManagedViewport): Promise<void> {
@@ -541,6 +712,7 @@ export class ViewportManager {
       isLoading: contents.isLoading(),
       error: this.#lastError,
       scaleMode: this.#scaleMode,
+      syncScrollEnabled: this.#syncScrollEnabled,
       viewportScales: Object.fromEntries(
         this.#managedViewports().map(({ id, resolvedScale }) => [id, resolvedScale]),
       ),

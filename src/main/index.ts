@@ -211,6 +211,9 @@ ipcMain.on(IPC.command, (_event, payload: unknown) => {
     case 'set-scale-mode':
       manager.setScaleMode(command.mode)
       break
+    case 'set-sync-scroll':
+      manager.setSyncScrollEnabled(command.enabled)
+      break
     case 'set-devices':
       void manager.setDevices(command.deviceIds)
       break

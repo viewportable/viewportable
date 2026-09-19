@@ -72,6 +72,7 @@ function installViewportableMock(): void {
     isLoading: false,
     error: null,
     scaleMode: 'fit',
+    syncScrollEnabled: true,
     viewportScales: {},
     activeDeviceIds: [...DEFAULT_DEVICE_IDS],
   }

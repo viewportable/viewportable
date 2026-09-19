@@ -19,6 +19,7 @@ const INITIAL_STATE: BrowserState = {
   isLoading: true,
   error: null,
   scaleMode: 'fit',
+  syncScrollEnabled: true,
   viewportScales: {},
   activeDeviceIds: [...DEFAULT_DEVICE_IDS],
 }

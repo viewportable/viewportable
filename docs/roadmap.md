@@ -11,7 +11,7 @@ The roadmap is ordered by product value and architectural leverage, not by featu
 - [x] Introduce `src/core/board.ts` as the single source of truth for board selection and reconcile rules.
 - [ ] Move workspace/preset state transitions into core.
 - [x] Move layout decisions into a pure core layout module.
-- [ ] Define sync semantics in core before wiring Electron events.
+- [x] Define normalized scroll-sync semantics in pure core before wiring Electron events.
 - [ ] Keep React components dependent on core/protocol, never Electron APIs directly.
 - [ ] Reduce `ViewportManager` to orchestration + WebContentsView/CDP lifecycle.
 
@@ -33,10 +33,10 @@ Exit criterion: board selection, ordering, scaling and sync state can be tested 
 
 First vertical slice:
 
-- [ ] `Sync scroll` toggle.
-- [ ] Synchronize document scroll by normalized progress.
-- [ ] Prevent feedback loops.
-- [ ] Handle different document heights.
+- [x] `Sync scroll` toggle.
+- [x] Synchronize document scroll by normalized progress.
+- [x] Prevent feedback loops.
+- [x] Handle different document heights.
 - [ ] Add deterministic integration coverage.
 
 Then:

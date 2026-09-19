@@ -67,6 +67,20 @@ export function Toolbar({ state }: Props) {
       </form>
 
       <div className="toolbar-meta">
+        <button
+          type="button"
+          className={state.syncScrollEnabled ? 'sync-scroll-toggle active' : 'sync-scroll-toggle'}
+          aria-label="Sync scroll"
+          aria-pressed={state.syncScrollEnabled}
+          onClick={() =>
+            window.viewportable.command({
+              type: 'set-sync-scroll',
+              enabled: !state.syncScrollEnabled,
+            })
+          }
+        >
+          Sync scroll
+        </button>
         <RecordingControl />
         <div className="scale-control" aria-label="Viewport scale mode">
           <button

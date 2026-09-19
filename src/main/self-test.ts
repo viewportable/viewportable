@@ -61,6 +61,10 @@ export async function runElectronSelfTest(
     assert.match(profile.userAgent, /Chrome\/152/, `${profile.id}: unexpected user agent`)
   }
 
+  manager.setSyncScrollEnabled(true)
+  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.6)
+  await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.6)
+
   DEFAULT_DEVICES.forEach((device, index) => {
     manager.setAvailableBounds(device.id, {
       x: 260 + index * 520,
@@ -190,6 +194,31 @@ async function waitForReportedLayout(
 
   throw new Error(
     `Timed out waiting for reported viewport layout. Last layout: ${JSON.stringify(lastLayout)}`,
+  )
+}
+
+async function waitForSyncedScroll(
+  manager: ViewportManager,
+  deviceIds: readonly string[],
+  expectedProgress: number,
+): Promise<void> {
+  const deadline = Date.now() + TIMEOUT_MS
+  let lastProgress: Record<string, number | null> = {}
+
+  while (Date.now() < deadline) {
+    lastProgress = await manager.inspectScrollProgress()
+
+    const synced = deviceIds.every((deviceId) => {
+      const progress = lastProgress[deviceId]
+      return progress !== null && progress !== undefined && Math.abs(progress - expectedProgress) < 0.03
+    })
+
+    if (synced) return
+    await delay(POLL_INTERVAL_MS)
+  }
+
+  throw new Error(
+    `Timed out waiting for synchronized scroll. Last progress: ${JSON.stringify(lastProgress)}`,
   )
 }
 

@@ -20,7 +20,9 @@ const server = createServer((_request, response) => {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Viewportable self-test</title>
   </head>
-  <body>Viewportable self-test</body>
+  <body style="min-height: 5000px; margin: 0">
+    <main style="height: 5000px">Viewportable self-test</main>
+  </body>
 </html>`)
 })
 
