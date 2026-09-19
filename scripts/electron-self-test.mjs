@@ -20,12 +20,29 @@ const server = createServer((_request, response) => {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Viewportable self-test</title>
   </head>
-  <body style="height: 100vh; margin: 0; overflow: hidden">
-    <main
-      id="sync-scroll-fixture"
-      style="height: 100vh; overflow-y: auto; overscroll-behavior: contain"
-    >
-      <div style="height: 5000px">Viewportable self-test nested scroll fixture</div>
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    .scrollable {
+      height: 100vh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .phone-shell { display: none; }
+    @media (max-width: 600px) {
+      .tablet-shell { display: none; }
+      .phone-shell { display: block; }
+    }
+  </style>
+  <body>
+    <section class="phone-shell">
+      <div>
+        <main class="scrollable">
+          <div style="height: 5000px">Phone responsive scroll fixture</div>
+        </main>
+      </div>
+    </section>
+    <main class="tablet-shell scrollable">
+      <div style="height: 5000px">Tablet responsive scroll fixture</div>
     </main>
   </body>
 </html>`)

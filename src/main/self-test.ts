@@ -61,7 +61,7 @@ export async function runElectronSelfTest(
     assert.match(profile.userAgent, /Chrome\/152/, `${profile.id}: unexpected user agent`)
   }
 
-  const scrollFixture = '#sync-scroll-fixture'
+  const scrollFixture = '.scrollable:not([style*="display: none"])'
 
   manager.setSyncScrollEnabled(true)
   await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.6, scrollFixture)
