@@ -104,6 +104,9 @@ function installViewportableMock(): void {
     },
     setViewportBounds() {},
     setBoardLayout() {},
+    onBoardScroll() {
+      return () => {}
+    },
     async saveRecording() {
       return { status: 'saved' }
     },

@@ -80,3 +80,10 @@ export type SaveRecordingRequest = z.infer<typeof SaveRecordingRequestSchema>
 export type SaveRecordingResult = {
   status: 'saved' | 'cancelled'
 }
+
+
+export const BoardScrollDeltaSchema = z.object({
+  deltaX: z.number().finite(),
+})
+
+export type BoardScrollDelta = z.infer<typeof BoardScrollDeltaSchema>

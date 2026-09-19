@@ -1,4 +1,9 @@
-import { BrowserWindow, WebContentsView, type Rectangle } from 'electron'
+import {
+  BrowserWindow,
+  WebContentsView,
+  type MouseWheelInputEvent,
+  type Rectangle,
+} from 'electron'
 import { planBoardReconcile, resolveBoardDevices } from '../core/board'
 import { resolveViewportLayouts } from '../core/layout'
 import {
@@ -6,6 +11,7 @@ import {
   type BrowserProfile,
   type DeviceSpec,
 } from '../shared/device'
+import { IPC } from '../shared/ipc'
 import type { ActiveScaleMode } from '../shared/scale'
 import { normalizeUrl } from '../shared/url'
 
@@ -409,6 +415,26 @@ export class ViewportManager {
     contents.on('before-input-event', (event, input) => {
       const modifier = process.platform === 'darwin' ? input.meta : input.control
       if (modifier && ['+', '=', '-', '0'].includes(input.key)) event.preventDefault()
+    })
+
+    contents.on('before-mouse-event', (event, mouse) => {
+      if (mouse.type !== 'mouseWheel') return
+
+      const wheel = mouse as MouseWheelInputEvent
+      const deltaX = wheel.deltaX ?? 0
+      const deltaY = wheel.deltaY ?? 0
+      const shift = wheel.modifiers?.includes('shift') ?? false
+      const horizontalGesture = shift || Math.abs(deltaX) > Math.abs(deltaY)
+      if (!horizontalGesture) return
+
+      const routedDelta = shift && Math.abs(deltaX) <= Math.abs(deltaY) ? deltaY : deltaX
+      if (Math.abs(routedDelta) < 0.01) return
+
+      event.preventDefault()
+
+      if (!this.#window.isDestroyed()) {
+        this.#window.webContents.send(IPC.boardScroll, { deltaX: routedDelta })
+      }
     })
 
     contents.setWindowOpenHandler(({ url }) => {

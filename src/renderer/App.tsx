@@ -32,7 +32,7 @@ export function App() {
   const [clippedDeviceIds, setClippedDeviceIds] = useState<Set<string>>(() => new Set())
 
   useEffect(() => {
-    const unsubscribe = window.viewportable.onBrowserState((nextState) => {
+    const unsubscribeState = window.viewportable.onBrowserState((nextState) => {
       selectionRef.current = [...nextState.activeDeviceIds]
       setState(nextState)
     })
@@ -42,7 +42,20 @@ export function App() {
     selectionRef.current = [...saved]
     window.viewportable.command({ type: 'set-devices', deviceIds: saved })
 
-    return unsubscribe
+    const unsubscribeBoardScroll = window.viewportable.onBoardScroll(({ deltaX }) => {
+      const scrollContainer = boardScrollRef.current
+      if (!scrollContainer) return
+
+      scrollContainer.scrollBy({
+        left: deltaX,
+        behavior: 'auto',
+      })
+    })
+
+    return () => {
+      unsubscribeState()
+      unsubscribeBoardScroll()
+    }
   }, [])
 
   const activeDevices = useMemo(

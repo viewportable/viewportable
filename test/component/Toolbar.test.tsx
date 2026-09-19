@@ -18,6 +18,9 @@ describe('Toolbar', () => {
       command,
       setViewportBounds() {},
       setBoardLayout() {},
+    onBoardScroll() {
+      return () => {}
+    },
       onBrowserState() {
         return () => {}
       },

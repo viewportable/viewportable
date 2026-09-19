@@ -64,6 +64,9 @@ describe('RecordingControl', () => {
       command() {},
       setViewportBounds() {},
       setBoardLayout() {},
+    onBoardScroll() {
+      return () => {}
+    },
       onBrowserState() {
         return () => {}
       },
