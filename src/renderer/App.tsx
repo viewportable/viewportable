@@ -4,7 +4,7 @@ import {
   resolveBoardDevices,
   toggleBoardDevice,
 } from '../core/board'
-import { resolveViewportScrollDelta } from '../core/board-scroll'
+import { resolveShellScrollDelta } from '../core/board-scroll'
 import { DEFAULT_DEVICE_IDS } from '../shared/device'
 import type { BrowserState } from '../shared/ipc'
 import { DeviceSidebar } from './components/DeviceSidebar'
@@ -59,7 +59,7 @@ export function App() {
     const handleShellWheel = (event: WheelEvent) => {
       if (!syncScrollEnabledRef.current || event.ctrlKey || event.metaKey) return
 
-      const deltaY = resolveViewportScrollDelta({
+      const deltaY = resolveShellScrollDelta({
         deltaX: event.deltaX,
         deltaY: event.deltaY,
         shift: event.shiftKey,
@@ -231,13 +231,6 @@ export function App() {
                   scale={state.viewportScales[device.id] ?? 1}
                   removable={activeDevices.length > 1}
                   clipped={clippedDeviceIds.has(device.id)}
-                  onScroll={(deltaY) =>
-                    window.viewportable.command({
-                      type: 'scroll-viewport',
-                      viewportId: device.id,
-                      deltaY,
-                    })
-                  }
                   onRemove={() => toggleDevice(device.id)}
                 />
               ))}

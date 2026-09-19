@@ -176,6 +176,7 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
         progress: Math.min(1, Math.max(0, updated.current / updated.max)),
         target: updated.selector,
         kind: updated.kind,
+        moved: Math.abs(updated.current - metrics.current) > 0.5,
       }
     }
 
@@ -192,6 +193,7 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
       progress: Math.min(1, Math.max(0, updated.current / updated.max)),
       target: null,
       kind: 'document',
+      moved: Math.abs(updated.current - metrics.current) > 0.5,
     }
   }
 
@@ -529,13 +531,6 @@ export class ViewportManager {
     `)
   }
 
-  async scrollViewportByDelta(viewportId: string, deltaY: number): Promise<void> {
-    const managed = this.#viewports.get(viewportId)
-    if (!managed || !managed.pageReady) return
-
-    await this.#scrollManagedByDelta(managed, deltaY)
-  }
-
   async inspectProfiles(): Promise<ViewportRuntimeProfile[]> {
     return Promise.all(
       this.#managedViewports().map(async ({ id, view, resolvedScale }) => {
@@ -847,18 +842,27 @@ export class ViewportManager {
 
   async #performSynchronizedScroll(deltaY: number, preferredSourceId: string | null): Promise<void> {
     const ordered = this.#managedViewports()
+    const visible = ordered.filter(
+      ({ lastArea, view }) =>
+        lastArea !== null &&
+        lastArea.width > 0 &&
+        lastArea.height > 0 &&
+        view.getVisible(),
+    )
+    const hidden = ordered.filter((managed) => !visible.includes(managed))
+    const baseCandidates = [...visible, ...hidden]
     const candidates = preferredSourceId
       ? [
-          ...ordered.filter(({ id }) => id === preferredSourceId),
-          ...ordered.filter(({ id }) => id !== preferredSourceId),
+          ...baseCandidates.filter(({ id }) => id === preferredSourceId),
+          ...baseCandidates.filter(({ id }) => id !== preferredSourceId),
         ]
-      : ordered
+      : baseCandidates
 
     for (const managed of candidates) {
       if (!managed.pageReady || !managed.scrollSyncBridgeReady) continue
 
       const payload = await this.#scrollManagedByDelta(managed, deltaY)
-      if (!payload) continue
+      if (!payload || !payload.moved) continue
 
       await this.#applyScrollSync(managed.id, payload.progress, payload.target, payload.kind)
       return
@@ -872,6 +876,7 @@ export class ViewportManager {
     progress: number
     target: string | null
     kind: 'document' | 'element'
+    moved: boolean
   } | null> {
     if (!Number.isFinite(deltaY) || Math.abs(deltaY) < 0.01) return null
 
@@ -881,6 +886,7 @@ export class ViewportManager {
       progress?: unknown
       target?: unknown
       kind?: unknown
+      moved?: unknown
     } | null
 
     if (!result || typeof result.progress !== 'number') return null
@@ -889,6 +895,7 @@ export class ViewportManager {
       progress: normalizeScrollProgress(result.progress),
       target: typeof result.target === 'string' ? result.target : null,
       kind: result.kind === 'element' ? 'element' : 'document',
+      moved: result.moved === true,
     }
   }
 

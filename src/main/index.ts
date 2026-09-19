@@ -215,9 +215,6 @@ ipcMain.on(IPC.command, (_event, payload: unknown) => {
     case 'set-sync-scroll':
       manager.setSyncScrollEnabled(command.enabled)
       break
-    case 'scroll-viewport':
-      void manager.scrollViewportByDelta(command.viewportId, command.deltaY)
-      break
     case 'scroll-all-viewports':
       manager.handleSynchronizedScroll(command.deltaY)
       break
