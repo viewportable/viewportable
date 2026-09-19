@@ -39,7 +39,7 @@ First vertical slice:
 - [x] Prevent feedback loops.
 - [x] Handle different document heights.
 - [x] Add deterministic integration coverage for sync-on and sync-off behavior.
-- [x] Make Sync Scroll input-driven: vertical wheel/trackpad anywhere inside the Viewportable window scrolls all viewports together.
+- [x] Make Sync Scroll shell-driven: vertical wheel/trackpad outside native webpages scrolls all viewports together, while scrolling inside a webpage stays local.
 
 Then:
 

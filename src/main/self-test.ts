@@ -64,17 +64,32 @@ export async function runElectronSelfTest(
   const scrollFixture = '.scrollable:not([style*="display: none"])'
 
   manager.setSyncScrollEnabled(true)
-  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.6, scrollFixture)
-  await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.6, scrollFixture)
 
-  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2, scrollFixture)
-  await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.2, scrollFixture)
+  for (const deviceId of DEFAULT_DEVICE_IDS) {
+    await manager.scrollViewportToProgress(deviceId, 0.2, scrollFixture)
+  }
+  await delay(150)
+
+  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.35, scrollFixture)
+  await delay(200)
+
+  const localOnlyProgress = await manager.inspectScrollProgress(scrollFixture)
+  assert.ok(
+    Math.abs((localOnlyProgress[DEFAULT_DEVICE_IDS[0]] ?? 0) - 0.35) < 0.03,
+    'Local viewport scroll did not move the source viewport',
+  )
+  assert.ok(
+    Math.abs((localOnlyProgress[DEFAULT_DEVICE_IDS[1]] ?? 0) - 0.2) < 0.03,
+    'Local viewport scroll leaked into another viewport while Sync Scroll was enabled',
+  )
+
+  for (const deviceId of DEFAULT_DEVICE_IDS) {
+    await manager.scrollViewportToProgress(deviceId, 0.5, scrollFixture)
+  }
+
   window.show()
   window.focus()
   await delay(150)
-
-  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.5, scrollFixture)
-  await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.5, scrollFixture)
 
   for (let index = 0; index < 20; index += 1) {
     window.webContents.sendInputEvent({
@@ -88,7 +103,7 @@ export async function runElectronSelfTest(
     })
     await delay(8)
   }
-  await delay(350)
+  await delay(450)
 
   const globalProgress = await manager.inspectScrollProgress(scrollFixture)
   const globalSourceProgress = globalProgress[DEFAULT_DEVICE_IDS[0]]
@@ -116,28 +131,15 @@ export async function runElectronSelfTest(
     canScroll: true,
     hasPreciseScrollingDeltas: true,
   })
-  await delay(150)
+  await delay(180)
 
   const disabledShellWheelProgress = await manager.inspectScrollProgress(scrollFixture)
-  assert.ok(
-    Math.abs(
-      (disabledShellWheelProgress[DEFAULT_DEVICE_IDS[0]] ?? 0) - globalSourceProgress,
-    ) < 0.03,
-    'Shell wheel moved viewports while Sync Scroll was disabled',
-  )
-
-  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2, scrollFixture)
-  await delay(300)
-
-  const unsyncedProgress = await manager.inspectScrollProgress(scrollFixture)
-  assert.ok(
-    Math.abs((unsyncedProgress[DEFAULT_DEVICE_IDS[0]] ?? 0) - 0.2) < 0.03,
-    'Source viewport did not move after disabling scroll sync',
-  )
-  assert.ok(
-    Math.abs((unsyncedProgress[DEFAULT_DEVICE_IDS[1]] ?? 0) - globalSourceProgress) < 0.03,
-    'Target viewport moved while scroll sync was disabled',
-  )
+  for (const deviceId of DEFAULT_DEVICE_IDS) {
+    assert.ok(
+      Math.abs((disabledShellWheelProgress[deviceId] ?? 0) - globalSourceProgress) < 0.03,
+      `${deviceId}: shell wheel moved viewport while Sync Scroll was disabled`,
+    )
+  }
 
   manager.setSyncScrollEnabled(true)
 
