@@ -200,6 +200,30 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
   document.addEventListener('scroll', onScroll, { capture: true, passive: true })
   window.addEventListener('scroll', onScroll, { passive: true })
 
+  window.__viewportableScrollByDelta = (deltaY) => {
+    const delta = Number(deltaY)
+    if (!Number.isFinite(delta) || Math.abs(delta) < 0.01) return
+
+    let metrics = documentMetrics()
+    if (metrics.max <= 0) metrics = fallbackMetrics('element')
+    if (!metrics || metrics.max <= 0) return
+
+    if (metrics.kind === 'element' && metrics.element instanceof Element) {
+      metrics.element.scrollBy({
+        top: delta,
+        left: 0,
+        behavior: 'auto',
+      })
+      return
+    }
+
+    window.scrollBy({
+      top: delta,
+      left: 0,
+      behavior: 'auto',
+    })
+  }
+
   window.__viewportableApplySyncedScroll = (payload) => {
     const progress = Math.min(1, Math.max(0, Number(payload?.progress) || 0))
     const selector = typeof payload?.target === 'string' ? payload.target : null
@@ -509,6 +533,23 @@ export class ViewportManager {
         window.scrollTo({ top: maxScrollY * ${normalized}, left: window.scrollX, behavior: 'auto' })
       })()
     `)
+  }
+
+  async scrollViewportByDelta(viewportId: string, deltaY: number): Promise<void> {
+    if (!Number.isFinite(deltaY) || Math.abs(deltaY) < 0.01) return
+
+    const managed = this.#viewports.get(viewportId)
+    if (!managed || !managed.pageReady) return
+
+    const expression = `window.__viewportableScrollByDelta?.(${deltaY})`
+    const debuggerApi = managed.view.webContents.debugger
+
+    if (debuggerApi.isAttached()) {
+      await debuggerApi.sendCommand('Runtime.evaluate', { expression })
+      return
+    }
+
+    await managed.view.webContents.executeJavaScript(expression)
   }
 
   async inspectProfiles(): Promise<ViewportRuntimeProfile[]> {

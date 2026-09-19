@@ -19,6 +19,11 @@ export const BrowserCommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('sync-state') }),
   z.object({ type: z.literal('set-scale-mode'), mode: z.enum(ACTIVE_SCALE_MODES) }),
   z.object({ type: z.literal('set-sync-scroll'), enabled: z.boolean() }),
+  z.object({
+    type: z.literal('scroll-viewport'),
+    viewportId: z.string().min(1),
+    deltaY: z.number().finite(),
+  }),
   z.object({ type: z.literal('set-devices'), deviceIds: DeviceIdsSchema }),
 ])
 
