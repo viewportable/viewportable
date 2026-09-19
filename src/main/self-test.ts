@@ -69,11 +69,16 @@ export async function runElectronSelfTest(
 
   await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2, scrollFixture)
   await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.2, scrollFixture)
-  assert.equal(
-    manager.handleSynchronizedScroll(400),
-    true,
-    'Global synchronized scroll was not accepted while enabled',
-  )
+  window.focus()
+  window.webContents.sendInputEvent({
+    type: 'mouseWheel',
+    x: 40,
+    y: 40,
+    deltaX: 0,
+    deltaY: 400,
+    canScroll: true,
+    hasPreciseScrollingDeltas: true,
+  })
   await delay(250)
 
   const globalProgress = await manager.inspectScrollProgress(scrollFixture)
@@ -92,11 +97,26 @@ export async function runElectronSelfTest(
   )
 
   manager.setSyncScrollEnabled(false)
-  assert.equal(
-    manager.handleSynchronizedScroll(400),
-    false,
-    'Global synchronized scroll was accepted while disabled',
+
+  window.webContents.sendInputEvent({
+    type: 'mouseWheel',
+    x: 40,
+    y: 40,
+    deltaX: 0,
+    deltaY: 400,
+    canScroll: true,
+    hasPreciseScrollingDeltas: true,
+  })
+  await delay(150)
+
+  const disabledShellWheelProgress = await manager.inspectScrollProgress(scrollFixture)
+  assert.ok(
+    Math.abs(
+      (disabledShellWheelProgress[DEFAULT_DEVICE_IDS[0]] ?? 0) - globalSourceProgress,
+    ) < 0.03,
+    'Shell wheel moved viewports while Sync Scroll was disabled',
   )
+
   await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2, scrollFixture)
   await delay(300)
 
