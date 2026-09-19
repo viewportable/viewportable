@@ -83,7 +83,7 @@ describe('Device Board', () => {
   })
 })
 
-function installViewportableMock(commandSpy?: ReturnType<typeof vi.fn>): void {
+function installViewportableMock(commandSpy?: (command: BrowserCommand) => void): void {
   let listener: ((state: BrowserState) => void) | null = null
   let state: BrowserState = {
     url: 'https://example.com',
