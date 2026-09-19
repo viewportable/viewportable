@@ -20,8 +20,13 @@ const server = createServer((_request, response) => {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Viewportable self-test</title>
   </head>
-  <body style="min-height: 5000px; margin: 0">
-    <main style="height: 5000px">Viewportable self-test</main>
+  <body style="height: 100vh; margin: 0; overflow: hidden">
+    <main
+      id="sync-scroll-fixture"
+      style="height: 100vh; overflow-y: auto; overscroll-behavior: contain"
+    >
+      <div style="height: 5000px">Viewportable self-test nested scroll fixture</div>
+    </main>
   </body>
 </html>`)
 })

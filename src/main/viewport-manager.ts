@@ -51,39 +51,107 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
 
   window.__viewportableSyncScrollInstalled = true
   let frame = 0
+  let pendingTarget = null
   let suppressUntil = 0
+
+  const isDocumentTarget = (target) =>
+    target === null ||
+    target === window ||
+    target === document ||
+    target === document.documentElement ||
+    target === document.body
+
+  const selectorFor = (element) => {
+    if (!(element instanceof Element)) return null
+
+    if (element.id) return '#' + CSS.escape(element.id)
+
+    const testId = element.getAttribute('data-testid')
+    if (testId) {
+      return '[data-testid="' + CSS.escape(testId) + '"]'
+    }
+
+    const parts = []
+    let current = element
+
+    while (current && current !== document.body && parts.length < 8) {
+      const parent = current.parentElement
+      if (!parent) break
+
+      let part = current.localName
+      const siblings = Array.from(parent.children).filter(
+        (candidate) => candidate.localName === current.localName,
+      )
+
+      if (siblings.length > 1) {
+        part += ':nth-of-type(' + (siblings.indexOf(current) + 1) + ')'
+      }
+
+      parts.unshift(part)
+      current = parent
+    }
+
+    return parts.length > 0 ? 'body > ' + parts.join(' > ') : null
+  }
+
+  const metricsFor = (target) => {
+    if (isDocumentTarget(target)) {
+      const root = document.scrollingElement || document.documentElement
+      return {
+        current: window.scrollY,
+        max: Math.max(0, root.scrollHeight - window.innerHeight),
+        selector: null,
+      }
+    }
+
+    if (!(target instanceof Element)) return null
+
+    return {
+      current: target.scrollTop,
+      max: Math.max(0, target.scrollHeight - target.clientHeight),
+      selector: selectorFor(target),
+    }
+  }
 
   const report = () => {
     frame = 0
     if (performance.now() < suppressUntil) return
 
-    const root = document.scrollingElement || document.documentElement
-    const maxScrollY = Math.max(0, root.scrollHeight - window.innerHeight)
-    if (maxScrollY <= 0) return
+    const metrics = metricsFor(pendingTarget)
+    pendingTarget = null
+    if (!metrics || metrics.max <= 0) return
 
-    const progress = Math.min(1, Math.max(0, window.scrollY / maxScrollY))
     const reportScroll = window.${SCROLL_SYNC_BINDING}
+    if (typeof reportScroll !== 'function') return
 
-    if (typeof reportScroll === 'function') {
-      reportScroll(JSON.stringify({ progress }))
-    }
+    const progress = Math.min(1, Math.max(0, metrics.current / metrics.max))
+    reportScroll(JSON.stringify({ progress, target: metrics.selector }))
   }
 
-  window.addEventListener(
-    'scroll',
-    () => {
-      if (frame === 0) frame = requestAnimationFrame(report)
-    },
-    { passive: true },
-  )
+  const onScroll = (event) => {
+    pendingTarget = event.target
+    if (frame === 0) frame = requestAnimationFrame(report)
+  }
 
-  window.__viewportableApplySyncedScroll = (progress) => {
-    const normalized = Math.min(1, Math.max(0, Number(progress) || 0))
+  document.addEventListener('scroll', onScroll, { capture: true, passive: true })
+  window.addEventListener('scroll', onScroll, { passive: true })
+
+  window.__viewportableApplySyncedScroll = (payload) => {
+    const progress = Math.min(1, Math.max(0, Number(payload?.progress) || 0))
+    const selector = typeof payload?.target === 'string' ? payload.target : null
+    const candidate = selector ? document.querySelector(selector) : null
+    const metrics = metricsFor(candidate)
+
+    suppressUntil = performance.now() + 160
+
+    if (candidate instanceof Element && metrics && metrics.max > 0) {
+      candidate.scrollTo({ top: metrics.max * progress, left: candidate.scrollLeft, behavior: 'auto' })
+      return
+    }
+
     const root = document.scrollingElement || document.documentElement
     const maxScrollY = Math.max(0, root.scrollHeight - window.innerHeight)
-
-    suppressUntil = performance.now() + 120
-    window.scrollTo({ top: maxScrollY * normalized, left: window.scrollX, behavior: 'auto' })
+    window.scrollTo({ top: maxScrollY * progress, left: window.scrollX, behavior: 'auto' })
   }
 })()
 `
@@ -128,7 +196,7 @@ export class ViewportManager {
   #currentUrl = 'https://example.com'
   #layoutTimer: ReturnType<typeof setTimeout> | null = null
   #scrollSyncTimer: ReturnType<typeof setTimeout> | null = null
-  #pendingScrollSync: { sourceId: string; progress: number } | null = null
+  #pendingScrollSync: { sourceId: string; progress: number; target: string | null } | null = null
   #lastBoardLayoutRevision = -1
 
   constructor(
@@ -285,11 +353,20 @@ export class ViewportManager {
     }))
   }
 
-  async inspectScrollProgress(): Promise<Record<string, number | null>> {
+  async inspectScrollProgress(selector?: string): Promise<Record<string, number | null>> {
+    const selectorLiteral = JSON.stringify(selector ?? null)
     const entries = await Promise.all(
       this.#managedViewports().map(async ({ id, view }) => {
         const progress = (await view.webContents.executeJavaScript(`
           (() => {
+            const selector = ${selectorLiteral}
+            const target = selector ? document.querySelector(selector) : null
+
+            if (target instanceof Element) {
+              const maxScrollY = Math.max(0, target.scrollHeight - target.clientHeight)
+              return maxScrollY > 0 ? target.scrollTop / maxScrollY : null
+            }
+
             const root = document.scrollingElement || document.documentElement
             const maxScrollY = Math.max(0, root.scrollHeight - window.innerHeight)
             return maxScrollY > 0 ? window.scrollY / maxScrollY : null
@@ -303,13 +380,28 @@ export class ViewportManager {
     return Object.fromEntries(entries)
   }
 
-  async scrollViewportToProgress(viewportId: string, progress: number): Promise<void> {
+  async scrollViewportToProgress(
+    viewportId: string,
+    progress: number,
+    selector?: string,
+  ): Promise<void> {
     const managed = this.#viewports.get(viewportId)
     if (!managed) throw new Error(`Unknown viewport: ${viewportId}`)
 
     const normalized = normalizeScrollProgress(progress)
+    const selectorLiteral = JSON.stringify(selector ?? null)
+
     await managed.view.webContents.executeJavaScript(`
       (() => {
+        const selector = ${selectorLiteral}
+        const target = selector ? document.querySelector(selector) : null
+
+        if (target instanceof Element) {
+          const maxScrollY = Math.max(0, target.scrollHeight - target.clientHeight)
+          target.scrollTo({ top: maxScrollY * ${normalized}, left: target.scrollLeft, behavior: 'auto' })
+          return
+        }
+
         const root = document.scrollingElement || document.documentElement
         const maxScrollY = Math.max(0, root.scrollHeight - window.innerHeight)
         window.scrollTo({ top: maxScrollY * ${normalized}, left: window.scrollX, behavior: 'auto' })
@@ -516,9 +608,14 @@ export class ViewportManager {
       if (binding.name !== SCROLL_SYNC_BINDING || typeof binding.payload !== 'string') return
 
       try {
-        const payload = JSON.parse(binding.payload) as { progress?: unknown }
+        const payload = JSON.parse(binding.payload) as { progress?: unknown; target?: unknown }
         if (typeof payload.progress !== 'number') return
-        this.#queueScrollSync(managed.id, payload.progress)
+
+        this.#queueScrollSync(
+          managed.id,
+          payload.progress,
+          typeof payload.target === 'string' ? payload.target : null,
+        )
       } catch {
         // Ignore malformed page-to-host scroll payloads.
       }
@@ -632,12 +729,13 @@ export class ViewportManager {
     })
   }
 
-  #queueScrollSync(sourceId: string, progress: number): void {
+  #queueScrollSync(sourceId: string, progress: number, target: string | null): void {
     if (!this.#syncScrollEnabled) return
 
     this.#pendingScrollSync = {
       sourceId,
       progress: normalizeScrollProgress(progress),
+      target,
     }
 
     if (this.#scrollSyncTimer !== null) return
@@ -648,7 +746,7 @@ export class ViewportManager {
       this.#pendingScrollSync = null
       if (!pending || !this.#syncScrollEnabled) return
 
-      this.#applyScrollSync(pending.sourceId, pending.progress)
+      this.#applyScrollSync(pending.sourceId, pending.progress, pending.target)
     }, LAYOUT_FRAME_MS)
   }
 
@@ -661,8 +759,9 @@ export class ViewportManager {
     this.#pendingScrollSync = null
   }
 
-  #applyScrollSync(sourceId: string, progress: number): void {
-    const expression = `window.__viewportableApplySyncedScroll?.(${progress})`
+  #applyScrollSync(sourceId: string, progress: number, target: string | null): void {
+    const payload = JSON.stringify({ progress, target })
+    const expression = `window.__viewportableApplySyncedScroll?.(${payload})`
 
     for (const managed of this.#managedViewports()) {
       if (managed.id === sourceId || !managed.pageReady) continue

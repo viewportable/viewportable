@@ -61,15 +61,17 @@ export async function runElectronSelfTest(
     assert.match(profile.userAgent, /Chrome\/152/, `${profile.id}: unexpected user agent`)
   }
 
+  const scrollFixture = '#sync-scroll-fixture'
+
   manager.setSyncScrollEnabled(true)
-  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.6)
-  await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.6)
+  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.6, scrollFixture)
+  await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.6, scrollFixture)
 
   manager.setSyncScrollEnabled(false)
-  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2)
+  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2, scrollFixture)
   await delay(300)
 
-  const unsyncedProgress = await manager.inspectScrollProgress()
+  const unsyncedProgress = await manager.inspectScrollProgress(scrollFixture)
   assert.ok(
     Math.abs((unsyncedProgress[DEFAULT_DEVICE_IDS[0]] ?? 0) - 0.2) < 0.03,
     'Source viewport did not move after disabling scroll sync',
@@ -220,12 +222,13 @@ async function waitForSyncedScroll(
   manager: ViewportManager,
   deviceIds: readonly string[],
   expectedProgress: number,
+  selector?: string,
 ): Promise<void> {
   const deadline = Date.now() + TIMEOUT_MS
   let lastProgress: Record<string, number | null> = {}
 
   while (Date.now() < deadline) {
-    lastProgress = await manager.inspectScrollProgress()
+    lastProgress = await manager.inspectScrollProgress(selector)
 
     const synced = deviceIds.every((deviceId) => {
       const progress = lastProgress[deviceId]
