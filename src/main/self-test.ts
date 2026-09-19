@@ -83,6 +83,31 @@ export async function runElectronSelfTest(
     'Local viewport scroll leaked into another viewport while Sync Scroll was enabled',
   )
 
+  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0, scrollFixture)
+  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[1], 0.5, scrollFixture)
+
+  assert.equal(
+    manager.handleSynchronizedScroll(-400),
+    true,
+    'Global synchronized scroll was not accepted for movable-source fallback',
+  )
+  await delay(250)
+
+  const fallbackProgress = await manager.inspectScrollProgress(scrollFixture)
+  const fallbackReference = fallbackProgress[DEFAULT_DEVICE_IDS[1]]
+  assert.ok(
+    fallbackReference !== null &&
+      fallbackReference !== undefined &&
+      fallbackReference < 0.48,
+    `Global scroll did not skip the blocked reference viewport: ${JSON.stringify(fallbackProgress)}`,
+  )
+  await waitForSyncedScroll(
+    manager,
+    DEFAULT_DEVICE_IDS,
+    fallbackReference,
+    scrollFixture,
+  )
+
   for (const deviceId of DEFAULT_DEVICE_IDS) {
     await manager.scrollViewportToProgress(deviceId, 0.5, scrollFixture)
   }
