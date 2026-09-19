@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ViewportCard } from '../../src/renderer/components/ViewportCard'
+import { cleanup } from '@testing-library/react'
 import { getDeviceById } from '../../src/shared/device'
 
 const device = getDeviceById('iphone-15-pro')!
+
+afterEach(() => {
+  cleanup()
+})
 
 describe('ViewportCard scroll zone', () => {
   it('proxies a vertical gutter wheel gesture into the viewport', () => {

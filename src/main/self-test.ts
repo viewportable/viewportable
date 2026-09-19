@@ -69,25 +69,34 @@ export async function runElectronSelfTest(
 
   await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2, scrollFixture)
   await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.2, scrollFixture)
-  await manager.scrollViewportByDelta(DEFAULT_DEVICE_IDS[0], 400)
-  await delay(200)
+  assert.equal(
+    manager.handleSynchronizedScroll(400),
+    true,
+    'Global synchronized scroll was not accepted while enabled',
+  )
+  await delay(250)
 
-  const gutterProgress = await manager.inspectScrollProgress(scrollFixture)
-  const gutterSourceProgress = gutterProgress[DEFAULT_DEVICE_IDS[0]]
+  const globalProgress = await manager.inspectScrollProgress(scrollFixture)
+  const globalSourceProgress = globalProgress[DEFAULT_DEVICE_IDS[0]]
   assert.ok(
-    gutterSourceProgress !== null &&
-      gutterSourceProgress !== undefined &&
-      gutterSourceProgress > 0.22,
-    `Gutter scroll proxy did not move the source viewport: ${JSON.stringify(gutterProgress)}`,
+    globalSourceProgress !== null &&
+      globalSourceProgress !== undefined &&
+      globalSourceProgress > 0.22,
+    `Global synchronized scroll did not move the source viewport: ${JSON.stringify(globalProgress)}`,
   )
   await waitForSyncedScroll(
     manager,
     DEFAULT_DEVICE_IDS,
-    gutterSourceProgress,
+    globalSourceProgress,
     scrollFixture,
   )
 
   manager.setSyncScrollEnabled(false)
+  assert.equal(
+    manager.handleSynchronizedScroll(400),
+    false,
+    'Global synchronized scroll was accepted while disabled',
+  )
   await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.2, scrollFixture)
   await delay(300)
 
@@ -97,7 +106,7 @@ export async function runElectronSelfTest(
     'Source viewport did not move after disabling scroll sync',
   )
   assert.ok(
-    Math.abs((unsyncedProgress[DEFAULT_DEVICE_IDS[1]] ?? 0) - gutterSourceProgress) < 0.03,
+    Math.abs((unsyncedProgress[DEFAULT_DEVICE_IDS[1]] ?? 0) - globalSourceProgress) < 0.03,
     'Target viewport moved while scroll sync was disabled',
   )
 

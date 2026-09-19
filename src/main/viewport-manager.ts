@@ -5,7 +5,7 @@ import {
   type Rectangle,
 } from 'electron'
 import { planBoardReconcile, resolveBoardDevices } from '../core/board'
-import { resolveBoardScrollDelta } from '../core/board-scroll'
+import { resolveBoardScrollDelta, resolveSynchronizedScrollDelta } from '../core/board-scroll'
 import { resolveViewportLayouts } from '../core/layout'
 import { normalizeScrollProgress } from '../core/sync'
 import {
@@ -202,11 +202,13 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
 
   window.__viewportableScrollByDelta = (deltaY) => {
     const delta = Number(deltaY)
-    if (!Number.isFinite(delta) || Math.abs(delta) < 0.01) return
+    if (!Number.isFinite(delta) || Math.abs(delta) < 0.01) return null
 
     let metrics = documentMetrics()
     if (metrics.max <= 0) metrics = fallbackMetrics('element')
-    if (!metrics || metrics.max <= 0) return
+    if (!metrics || metrics.max <= 0) return null
+
+    suppressUntil = performance.now() + 160
 
     if (metrics.kind === 'element' && metrics.element instanceof Element) {
       metrics.element.scrollBy({
@@ -214,7 +216,15 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
         left: 0,
         behavior: 'auto',
       })
-      return
+
+      const updated = elementMetrics(metrics.element)
+      if (!updated || updated.max <= 0) return null
+
+      return {
+        progress: Math.min(1, Math.max(0, updated.current / updated.max)),
+        target: updated.selector,
+        kind: updated.kind,
+      }
     }
 
     window.scrollBy({
@@ -222,6 +232,15 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
       left: 0,
       behavior: 'auto',
     })
+
+    const updated = documentMetrics()
+    if (updated.max <= 0) return null
+
+    return {
+      progress: Math.min(1, Math.max(0, updated.current / updated.max)),
+      target: null,
+      kind: 'document',
+    }
   }
 
   window.__viewportableApplySyncedScroll = (payload) => {
@@ -305,6 +324,10 @@ export class ViewportManager {
   #currentUrl = 'https://example.com'
   #layoutTimer: ReturnType<typeof setTimeout> | null = null
   #scrollSyncTimer: ReturnType<typeof setTimeout> | null = null
+  #hostScrollTimer: ReturnType<typeof setTimeout> | null = null
+  #pendingHostScrollDelta = 0
+  #pendingHostScrollSourceId: string | null = null
+  #hostScrollChain: Promise<void> = Promise.resolve()
   #pendingScrollSync: {
     sourceId: string
     progress: number
@@ -417,8 +440,39 @@ export class ViewportManager {
     if (this.#syncScrollEnabled === enabled) return
 
     this.#syncScrollEnabled = enabled
-    if (!enabled) this.#cancelScrollSync()
+    if (!enabled) {
+      this.#cancelScrollSync()
+      this.#cancelHostScroll()
+    }
     this.#emitPrimaryState()
+  }
+
+  handleSynchronizedScroll(deltaY: number, preferredSourceId?: string): boolean {
+    if (!this.#syncScrollEnabled || !Number.isFinite(deltaY) || Math.abs(deltaY) < 0.01) {
+      return false
+    }
+
+    this.#pendingHostScrollDelta += deltaY
+    if (preferredSourceId) this.#pendingHostScrollSourceId = preferredSourceId
+
+    if (this.#hostScrollTimer === null) {
+      this.#hostScrollTimer = setTimeout(() => {
+        this.#hostScrollTimer = null
+
+        const delta = this.#pendingHostScrollDelta
+        const sourceId = this.#pendingHostScrollSourceId
+        this.#pendingHostScrollDelta = 0
+        this.#pendingHostScrollSourceId = null
+
+        this.#hostScrollChain = this.#hostScrollChain
+          .then(() => this.#performSynchronizedScroll(delta, sourceId))
+          .catch((error: unknown) => {
+            console.warn('[viewportable] Host-driven scroll sync failed', error)
+          })
+      }, LAYOUT_FRAME_MS)
+    }
+
+    return true
   }
 
   emitState(): void {
@@ -536,20 +590,10 @@ export class ViewportManager {
   }
 
   async scrollViewportByDelta(viewportId: string, deltaY: number): Promise<void> {
-    if (!Number.isFinite(deltaY) || Math.abs(deltaY) < 0.01) return
-
     const managed = this.#viewports.get(viewportId)
     if (!managed || !managed.pageReady) return
 
-    const expression = `window.__viewportableScrollByDelta?.(${deltaY})`
-    const debuggerApi = managed.view.webContents.debugger
-
-    if (debuggerApi.isAttached()) {
-      await debuggerApi.sendCommand('Runtime.evaluate', { expression })
-      return
-    }
-
-    await managed.view.webContents.executeJavaScript(expression)
+    await this.#scrollManagedByDelta(managed, deltaY)
   }
 
   async inspectProfiles(): Promise<ViewportRuntimeProfile[]> {
@@ -578,6 +622,7 @@ export class ViewportManager {
   destroy(): void {
     this.#cancelScheduledLayout()
     this.#cancelScrollSync()
+    this.#cancelHostScroll()
 
     while (this.#viewportOrder.length > 0) {
       const id = this.#viewportOrder[0]
@@ -773,17 +818,28 @@ export class ViewportManager {
       if (mouse.type !== 'mouseWheel') return
 
       const wheel = mouse as MouseWheelInputEvent
-      const routedDelta = resolveBoardScrollDelta({
+      const gesture = {
         deltaX: wheel.deltaX ?? 0,
         deltaY: wheel.deltaY ?? 0,
         shift: wheel.modifiers?.includes('shift') ?? false,
-      })
-      if (routedDelta === null) return
+      }
+      const routedDelta = resolveBoardScrollDelta(gesture)
 
-      event.preventDefault()
+      if (routedDelta !== null) {
+        event.preventDefault()
 
-      if (!this.#window.isDestroyed()) {
-        this.#window.webContents.send(IPC.boardScroll, { deltaX: routedDelta })
+        if (!this.#window.isDestroyed()) {
+          this.#window.webContents.send(IPC.boardScroll, { deltaX: routedDelta })
+        }
+        return
+      }
+
+      const synchronizedDelta = resolveSynchronizedScrollDelta(gesture)
+      if (
+        synchronizedDelta !== null &&
+        this.handleSynchronizedScroll(synchronizedDelta, managed.id)
+      ) {
+        event.preventDefault()
       }
     })
 
@@ -875,6 +931,63 @@ export class ViewportManager {
     await debuggerApi.sendCommand('Runtime.evaluate', {
       expression: SCROLL_SYNC_INSTALL_SCRIPT,
     })
+  }
+
+  #cancelHostScroll(): void {
+    if (this.#hostScrollTimer !== null) {
+      clearTimeout(this.#hostScrollTimer)
+      this.#hostScrollTimer = null
+    }
+
+    this.#pendingHostScrollDelta = 0
+    this.#pendingHostScrollSourceId = null
+  }
+
+  async #performSynchronizedScroll(deltaY: number, preferredSourceId: string | null): Promise<void> {
+    const ordered = this.#managedViewports()
+    const candidates = preferredSourceId
+      ? [
+          ...ordered.filter(({ id }) => id === preferredSourceId),
+          ...ordered.filter(({ id }) => id !== preferredSourceId),
+        ]
+      : ordered
+
+    for (const managed of candidates) {
+      if (!managed.pageReady || !managed.scrollSyncBridgeReady) continue
+
+      const payload = await this.#scrollManagedByDelta(managed, deltaY)
+      if (!payload) continue
+
+      this.#applyScrollSync(managed.id, payload.progress, payload.target, payload.kind)
+      return
+    }
+  }
+
+  async #scrollManagedByDelta(
+    managed: ManagedViewport,
+    deltaY: number,
+  ): Promise<{
+    progress: number
+    target: string | null
+    kind: 'document' | 'element'
+  } | null> {
+    if (!Number.isFinite(deltaY) || Math.abs(deltaY) < 0.01) return null
+
+    const result = (await managed.view.webContents.executeJavaScript(
+      `window.__viewportableScrollByDelta?.(${deltaY}) ?? null`,
+    )) as {
+      progress?: unknown
+      target?: unknown
+      kind?: unknown
+    } | null
+
+    if (!result || typeof result.progress !== 'number') return null
+
+    return {
+      progress: normalizeScrollProgress(result.progress),
+      target: typeof result.target === 'string' ? result.target : null,
+      kind: result.kind === 'element' ? 'element' : 'document',
+    }
   }
 
   #queueScrollSync(

@@ -6,10 +6,12 @@ import {
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
+  type MouseWheelInputEvent,
 } from 'electron'
 import { writeFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { resolveSynchronizedScrollDelta } from '../core/board-scroll'
 import { DEFAULT_DEVICES } from '../shared/device'
 import {
   BoardLayoutSnapshotSchema,
@@ -148,6 +150,22 @@ function createWindow(): BrowserWindow {
   })
 
   traceStartup('viewport-manager:create:done')
+
+  window.webContents.on('before-mouse-event', (event, mouse) => {
+    if (mouse.type !== 'mouseWheel') return
+
+    const wheel = mouse as MouseWheelInputEvent
+    const delta = resolveSynchronizedScrollDelta({
+      deltaX: wheel.deltaX ?? 0,
+      deltaY: wheel.deltaY ?? 0,
+      shift: wheel.modifiers?.includes('shift') ?? false,
+    })
+
+    if (delta !== null && manager.handleSynchronizedScroll(delta)) {
+      event.preventDefault()
+    }
+  })
+
   viewportManager = manager
   mainWindow = window
 

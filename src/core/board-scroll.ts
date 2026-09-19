@@ -36,3 +36,13 @@ export function resolveViewportScrollDelta({
 
   return Math.abs(delta) < 0.01 ? null : delta
 }
+
+
+export function resolveSynchronizedScrollDelta({
+  deltaX,
+  deltaY,
+  shift,
+}: WheelGesture): number | null {
+  if (shift || Math.abs(deltaX) > Math.abs(deltaY)) return null
+  return Math.abs(deltaY) < 0.01 ? null : deltaY
+}

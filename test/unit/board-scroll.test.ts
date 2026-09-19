@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   resolveBoardScrollDelta,
+  resolveSynchronizedScrollDelta,
   resolveViewportScrollDelta,
 } from '../../src/core/board-scroll'
 
@@ -31,6 +32,24 @@ describe('board scroll routing', () => {
         pageHeight: 600,
       }),
     ).toBe(40)
+  })
+
+  it('routes vertical gestures into global synchronized scrolling', () => {
+    expect(
+      resolveSynchronizedScrollDelta({
+        deltaX: 2,
+        deltaY: 36,
+        shift: false,
+      }),
+    ).toBe(36)
+
+    expect(
+      resolveSynchronizedScrollDelta({
+        deltaX: 40,
+        deltaY: 4,
+        shift: false,
+      }),
+    ).toBeNull()
   })
 
   it('keeps horizontal and Shift+wheel gestures out of viewport proxy scrolling', () => {

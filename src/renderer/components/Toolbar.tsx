@@ -72,6 +72,11 @@ export function Toolbar({ state }: Props) {
           className={state.syncScrollEnabled ? 'sync-scroll-toggle active' : 'sync-scroll-toggle'}
           aria-label="Sync scroll"
           aria-pressed={state.syncScrollEnabled}
+          title={
+            state.syncScrollEnabled
+              ? 'Scroll anywhere in Viewportable to move all viewports together'
+              : 'Enable synchronized scrolling across all viewports'
+          }
           onClick={() =>
             window.viewportable.command({
               type: 'set-sync-scroll',
