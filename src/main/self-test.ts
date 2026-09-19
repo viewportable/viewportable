@@ -73,24 +73,30 @@ export async function runElectronSelfTest(
   window.focus()
   await delay(150)
 
-  window.webContents.sendInputEvent({
-    type: 'mouseWheel',
-    x: 40,
-    y: 40,
-    deltaX: 0,
-    deltaY: 400,
-    canScroll: true,
-    hasPreciseScrollingDeltas: true,
-  })
-  await delay(250)
+  await manager.scrollViewportToProgress(DEFAULT_DEVICE_IDS[0], 0.5, scrollFixture)
+  await waitForSyncedScroll(manager, DEFAULT_DEVICE_IDS, 0.5, scrollFixture)
+
+  for (let index = 0; index < 20; index += 1) {
+    window.webContents.sendInputEvent({
+      type: 'mouseWheel',
+      x: 40,
+      y: 40,
+      deltaX: 0,
+      deltaY: 30,
+      canScroll: true,
+      hasPreciseScrollingDeltas: true,
+    })
+    await delay(8)
+  }
+  await delay(350)
 
   const globalProgress = await manager.inspectScrollProgress(scrollFixture)
   const globalSourceProgress = globalProgress[DEFAULT_DEVICE_IDS[0]]
   assert.ok(
     globalSourceProgress !== null &&
       globalSourceProgress !== undefined &&
-      Math.abs(globalSourceProgress - 0.2) > 0.02,
-    `Global synchronized scroll did not move the source viewport: ${JSON.stringify(globalProgress)}`,
+      Math.abs(globalSourceProgress - 0.5) > 0.08,
+    `Global wheel burst stalled after the first impulses: ${JSON.stringify(globalProgress)}`,
   )
   await waitForSyncedScroll(
     manager,
