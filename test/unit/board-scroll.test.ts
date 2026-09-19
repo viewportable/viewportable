@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   resolveBoardScrollDelta,
-  resolveShellScrollDelta,
+  resolveGlobalScrollDelta,
 } from '../../src/core/board-scroll'
 
 describe('board scroll routing', () => {
@@ -23,34 +23,28 @@ describe('board scroll routing', () => {
 
   it('routes vertical shell gestures into global synchronized scrolling', () => {
     expect(
-      resolveShellScrollDelta({
+      resolveGlobalScrollDelta({
         deltaX: 3,
         deltaY: 40,
         shift: false,
-        deltaMode: 0,
-        pageHeight: 600,
       }),
     ).toBe(40)
   })
 
   it('keeps horizontal and Shift+wheel gestures out of global vertical scrolling', () => {
     expect(
-      resolveShellScrollDelta({
+      resolveGlobalScrollDelta({
         deltaX: 40,
         deltaY: 4,
         shift: false,
-        deltaMode: 0,
-        pageHeight: 600,
       }),
     ).toBeNull()
 
     expect(
-      resolveShellScrollDelta({
+      resolveGlobalScrollDelta({
         deltaX: 0,
         deltaY: 40,
         shift: true,
-        deltaMode: 0,
-        pageHeight: 600,
       }),
     ).toBeNull()
   })

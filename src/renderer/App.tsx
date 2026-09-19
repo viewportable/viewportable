@@ -4,7 +4,6 @@ import {
   resolveBoardDevices,
   toggleBoardDevice,
 } from '../core/board'
-import { resolveShellScrollDelta } from '../core/board-scroll'
 import { DEFAULT_DEVICE_IDS } from '../shared/device'
 import type { BrowserState } from '../shared/ipc'
 import { DeviceSidebar } from './components/DeviceSidebar'
@@ -29,7 +28,6 @@ export function App() {
   const [state, setState] = useState<BrowserState>(INITIAL_STATE)
   const selectionRef = useRef<string[]>([...INITIAL_STATE.activeDeviceIds])
   const pendingRevealRef = useRef<string | null>(null)
-  const syncScrollEnabledRef = useRef(INITIAL_STATE.syncScrollEnabled)
   const boardScrollRef = useRef<HTMLDivElement>(null)
   const layoutRevisionRef = useRef(0)
   const [clippedDeviceIds, setClippedDeviceIds] = useState<Set<string>>(() => new Set())
@@ -37,7 +35,6 @@ export function App() {
   useEffect(() => {
     const unsubscribeState = window.viewportable.onBrowserState((nextState) => {
       selectionRef.current = [...nextState.activeDeviceIds]
-      syncScrollEnabledRef.current = nextState.syncScrollEnabled
       setState(nextState)
     })
     window.viewportable.command({ type: 'sync-state' })
@@ -56,36 +53,9 @@ export function App() {
       })
     })
 
-    const handleShellWheel = (event: WheelEvent) => {
-      if (!syncScrollEnabledRef.current || event.ctrlKey || event.metaKey) return
-
-      const deltaY = resolveShellScrollDelta({
-        deltaX: event.deltaX,
-        deltaY: event.deltaY,
-        shift: event.shiftKey,
-        deltaMode: event.deltaMode,
-        pageHeight: window.innerHeight,
-      })
-
-      if (deltaY === null) return
-
-      event.preventDefault()
-      event.stopPropagation()
-      window.viewportable.command({
-        type: 'scroll-all-viewports',
-        deltaY,
-      })
-    }
-
-    window.addEventListener('wheel', handleShellWheel, {
-      capture: true,
-      passive: false,
-    })
-
     return () => {
       unsubscribeState()
       unsubscribeBoardScroll()
-      window.removeEventListener('wheel', handleShellWheel, { capture: true })
     }
   }, [])
 
