@@ -21,7 +21,7 @@ const server = createServer((_request, response) => {
     <title>Viewportable self-test</title>
   </head>
   <style>
-    html, body { height: 100%; margin: 0; overflow: hidden; }
+    html, body { height: 100%; margin: 0; overflow: clip; }
     .scrollable {
       height: 100vh;
       overflow-y: auto;
@@ -34,6 +34,10 @@ const server = createServer((_request, response) => {
     }
   </style>
   <body>
+    <div
+      aria-hidden="true"
+      style="position: absolute; top: 3000px; width: 1px; height: 1px"
+    ></div>
     <section class="phone-shell">
       <div>
         <main class="scrollable">

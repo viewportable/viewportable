@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ViewportableApi } from '../../src/preload'
@@ -34,6 +34,26 @@ describe('Device Board', () => {
   afterEach(() => {
     cleanup()
     vi.unstubAllGlobals()
+  })
+
+  it('routes a vertical shell wheel to all viewports while Sync Scroll is enabled', async () => {
+    const command = vi.fn()
+    installViewportableMock(command)
+
+    render(<App />)
+
+    fireEvent.wheel(document.body, {
+      deltaX: 0,
+      deltaY: 80,
+      deltaMode: 0,
+    })
+
+    await waitFor(() => {
+      expect(command).toHaveBeenCalledWith({
+        type: 'scroll-all-viewports',
+        deltaY: 80,
+      })
+    })
   })
 
   it('can remove a device and add the same device again', async () => {

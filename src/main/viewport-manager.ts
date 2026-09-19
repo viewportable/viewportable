@@ -49,6 +49,15 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
   if (window.top !== window || window.__viewportableSyncScrollInstalled) return
 
   window.__viewportableSyncScrollInstalled = true
+  let lastScrollTarget = null
+
+  const isDocumentTarget = (target) =>
+    target === null ||
+    target === window ||
+    target === document ||
+    target === document.documentElement ||
+    target === document.body
+
   const isScrollableElement = (element) => {
     if (!(element instanceof Element)) return false
 
@@ -57,7 +66,11 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
     const allowsScroll =
       overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay'
 
-    return allowsScroll && element.clientHeight > 0 && element.scrollHeight - element.clientHeight > 1
+    return (
+      allowsScroll &&
+      element.clientHeight > 0 &&
+      element.scrollHeight - element.clientHeight > 1
+    )
   }
 
   const visibleArea = (element) => {
@@ -67,22 +80,12 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
     return width * height
   }
 
-  const primaryScrollableElement = () => {
-    let best = null
-    let bestArea = 0
+  const scrollableElementsByArea = () =>
+    Array.from(document.querySelectorAll('*'))
+      .filter(isScrollableElement)
+      .sort((left, right) => visibleArea(right) - visibleArea(left))
 
-    for (const element of document.querySelectorAll('*')) {
-      if (!isScrollableElement(element)) continue
-
-      const area = visibleArea(element)
-      if (area > bestArea) {
-        best = element
-        bestArea = area
-      }
-    }
-
-    return best
-  }
+  const primaryScrollableElement = () => scrollableElementsByArea()[0] ?? null
 
   const selectorFor = (element) => {
     if (!(element instanceof Element)) return null
@@ -140,43 +143,71 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
     }
   }
 
-  const fallbackMetrics = (kind) => {
-    if (kind === 'element') {
-      const primary = primaryScrollableElement()
-      const metrics = elementMetrics(primary)
-      if (metrics) return metrics
-    }
-
-    const documentTarget = documentMetrics()
-    if (documentTarget.max > 0) return documentTarget
-
-    const primary = primaryScrollableElement()
-    return elementMetrics(primary)
+  const metricsFor = (target) => {
+    if (isDocumentTarget(target)) return documentMetrics()
+    return elementMetrics(target)
   }
 
-  window.__viewportableScrollByDelta = (deltaY) => {
-    const delta = Number(deltaY)
-    if (!Number.isFinite(delta) || Math.abs(delta) < 0.01) return null
+  const rememberScrollTarget = (event) => {
+    const target = event.target
+    if (isDocumentTarget(target)) {
+      lastScrollTarget = document
+      return
+    }
 
-    let metrics = documentMetrics()
-    if (metrics.max <= 0) metrics = fallbackMetrics('element')
-    if (!metrics || metrics.max <= 0) return null
+    if (target instanceof Element && isScrollableElement(target)) {
+      lastScrollTarget = target
+    }
+  }
 
-    if (metrics.kind === 'element' && metrics.element instanceof Element) {
-      metrics.element.scrollBy({
+  document.addEventListener('scroll', rememberScrollTarget, {
+    capture: true,
+    passive: true,
+  })
+  window.addEventListener('scroll', rememberScrollTarget, { passive: true })
+
+  const scrollCandidates = () => {
+    const candidates = []
+    const seen = new Set()
+
+    const add = (target) => {
+      const key = isDocumentTarget(target) ? 'document' : target
+      if (seen.has(key)) return
+      seen.add(key)
+      candidates.push(target)
+    }
+
+    if (lastScrollTarget) add(lastScrollTarget)
+    add(document)
+
+    for (const element of scrollableElementsByArea()) add(element)
+
+    return candidates
+  }
+
+  const tryScrollTarget = (target, delta) => {
+    const before = metricsFor(target)
+    if (!before || before.max <= 0) return null
+
+    if (before.kind === 'element' && before.element instanceof Element) {
+      before.element.scrollBy({
         top: delta,
         left: 0,
         behavior: 'auto',
       })
 
-      const updated = elementMetrics(metrics.element)
-      if (!updated || updated.max <= 0) return null
+      const after = elementMetrics(before.element)
+      if (!after || after.max <= 0) return null
 
+      const moved = Math.abs(after.current - before.current) > 0.5
+      if (!moved) return null
+
+      lastScrollTarget = before.element
       return {
-        progress: Math.min(1, Math.max(0, updated.current / updated.max)),
-        target: updated.selector,
-        kind: updated.kind,
-        moved: Math.abs(updated.current - metrics.current) > 0.5,
+        progress: Math.min(1, Math.max(0, after.current / after.max)),
+        target: after.selector,
+        kind: after.kind,
+        moved: true,
       }
     }
 
@@ -186,15 +217,74 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
       behavior: 'auto',
     })
 
-    const updated = documentMetrics()
-    if (updated.max <= 0) return null
+    const after = documentMetrics()
+    const moved = Math.abs(after.current - before.current) > 0.5
+    if (!moved) return null
 
+    lastScrollTarget = document
     return {
-      progress: Math.min(1, Math.max(0, updated.current / updated.max)),
+      progress: Math.min(1, Math.max(0, after.current / after.max)),
       target: null,
       kind: 'document',
-      moved: Math.abs(updated.current - metrics.current) > 0.5,
+      moved: true,
     }
+  }
+
+  window.__viewportableScrollByDelta = (deltaY) => {
+    const delta = Number(deltaY)
+    if (!Number.isFinite(delta) || Math.abs(delta) < 0.01) return null
+
+    for (const target of scrollCandidates()) {
+      const result = tryScrollTarget(target, delta)
+      if (result) return result
+    }
+
+    return null
+  }
+
+  const applyProgress = (metrics, progress) => {
+    if (!metrics || metrics.max <= 0) return false
+
+    const desired = metrics.max * progress
+    const before = metrics.current
+
+    if (metrics.kind === 'element' && metrics.element instanceof Element) {
+      metrics.element.scrollTo({
+        top: desired,
+        left: metrics.element.scrollLeft,
+        behavior: 'auto',
+      })
+
+      const after = elementMetrics(metrics.element)
+      if (!after) return false
+
+      const alreadyThere = Math.abs(before - desired) <= 1
+      const reached = Math.abs(after.current - desired) <= 2
+
+      if (reached || alreadyThere) {
+        lastScrollTarget = metrics.element
+        return true
+      }
+
+      return false
+    }
+
+    window.scrollTo({
+      top: desired,
+      left: window.scrollX,
+      behavior: 'auto',
+    })
+
+    const after = documentMetrics()
+    const alreadyThere = Math.abs(before - desired) <= 1
+    const reached = Math.abs(after.current - desired) <= 2
+
+    if (reached || alreadyThere) {
+      lastScrollTarget = document
+      return true
+    }
+
+    return false
   }
 
   window.__viewportableApplySyncedScroll = (payload) => {
@@ -202,36 +292,29 @@ const SCROLL_SYNC_INSTALL_SCRIPT = `
     const selector = typeof payload?.target === 'string' ? payload.target : null
     const kind = payload?.kind === 'element' ? 'element' : 'document'
 
-    let metrics = null
-
     if (selector) {
       try {
-        metrics = elementMetrics(document.querySelector(selector))
+        const exact = elementMetrics(document.querySelector(selector))
+        if (applyProgress(exact, progress)) return
       } catch {
-        metrics = null
+        // Fall through to semantic matching.
       }
     }
 
-    if (!metrics || metrics.max <= 0) {
-      metrics = fallbackMetrics(kind)
-    }
+    if (kind === 'element') {
+      for (const element of scrollableElementsByArea()) {
+        if (applyProgress(elementMetrics(element), progress)) return
+      }
 
-    if (!metrics || metrics.max <= 0) return
-
-    if (metrics.kind === 'element' && metrics.element instanceof Element) {
-      metrics.element.scrollTo({
-        top: metrics.max * progress,
-        left: metrics.element.scrollLeft,
-        behavior: 'auto',
-      })
+      applyProgress(documentMetrics(), progress)
       return
     }
 
-    window.scrollTo({
-      top: metrics.max * progress,
-      left: window.scrollX,
-      behavior: 'auto',
-    })
+    if (applyProgress(documentMetrics(), progress)) return
+
+    for (const element of scrollableElementsByArea()) {
+      if (applyProgress(elementMetrics(element), progress)) return
+    }
   }
 })()
 `

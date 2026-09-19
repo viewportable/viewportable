@@ -6,12 +6,10 @@ import {
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
-  type MouseWheelInputEvent,
 } from 'electron'
 import { writeFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { resolveGlobalScrollDelta } from '../core/board-scroll'
 import { DEFAULT_DEVICES } from '../shared/device'
 import {
   BoardLayoutSnapshotSchema,
@@ -135,18 +133,6 @@ function createWindow(): BrowserWindow {
   window.webContents.on('before-input-event', (event, input) => {
     const modifier = process.platform === 'darwin' ? input.meta : input.control
     if (modifier && ['+', '=', '-', '0'].includes(input.key)) event.preventDefault()
-  })
-  window.webContents.on('input-event', (_event, input) => {
-    if (input.type !== 'mouseWheel') return
-
-    const wheel = input as MouseWheelInputEvent
-    const deltaY = resolveGlobalScrollDelta({
-      deltaX: wheel.deltaX ?? 0,
-      deltaY: -(wheel.deltaY ?? 0),
-      shift: wheel.modifiers?.includes('shift') ?? false,
-    })
-
-    if (deltaY !== null) manager.handleSynchronizedScroll(deltaY)
   })
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   window.webContents.on('preload-error', (_event, preloadPath, error) => {

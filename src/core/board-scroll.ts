@@ -17,12 +17,23 @@ export function resolveBoardScrollDelta({
 }
 
 
-export function resolveGlobalScrollDelta({
+export type ShellWheelGesture = WheelGesture & {
+  deltaMode: number
+  pageHeight: number
+}
+
+export function resolveShellScrollDelta({
   deltaX,
   deltaY,
   shift,
-}: WheelGesture): number | null {
+  deltaMode,
+  pageHeight,
+}: ShellWheelGesture): number | null {
   if (shift || Math.abs(deltaX) > Math.abs(deltaY)) return null
-  return Math.abs(deltaY) < 0.01 ? null : deltaY
+
+  const multiplier = deltaMode === 1 ? 16 : deltaMode === 2 ? Math.max(1, pageHeight) : 1
+  const delta = deltaY * multiplier
+
+  return Math.abs(delta) < 0.01 ? null : delta
 }
 
