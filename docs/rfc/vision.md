@@ -1,7 +1,7 @@
 # Viewportable Vision
 
 Status: Living RFC  
-Last updated: 2026-09-19
+Last updated: 2026-09-21
 
 ## Product thesis
 
@@ -13,7 +13,7 @@ The goal is not to clone every feature in an existing browser. The product shoul
 2. Correct and explicit emulation semantics.
 3. Synchronized interaction across viewports.
 4. Truthful visual comparison through Proportional and calibrated True 1:1 scale.
-5. Deterministic responsive diagnostics through Slice.
+5. Deterministic responsive diagnostics through the separate Viewportable Engine, currently evolving from Slice.
 6. An agent-friendly core that can be driven through UI, protocol, CLI or automation.
 
 > Viewportable = responsive browser + truthful viewport comparison + deterministic responsive QA + automation.
@@ -83,7 +83,7 @@ An iPhone geometry rendered by Chromium is not Safari/WebKit. The UI and documen
 
 ### Deterministic diagnostics before AI
 
-Slice should detect measurable responsive failures such as overflow, clipping and collisions deterministically. AI can explain or prioritize findings later, but it should not be required to detect basic geometry failures.
+Slice is evolving into the Viewportable Engine as a separate headless diagnostics layer. The Engine should detect measurable responsive failures such as overflow, clipping, collision/occlusion and wrapping deterministically. Electron must consume that layer through stable contracts rather than reimplement detector logic. AI can explain or prioritize findings later, but it should not be required to detect basic structural failures.
 
 ## Competitive matrix
 
@@ -105,7 +105,7 @@ Legend: ✅ available, ◐ partial/basic, — not a primary capability, 🧭 pla
 | Shared Proportional scale | ✅ | ✅ | ? | ? | ? | ? | — |
 | Calibrated physical True 1:1 | — | 🧭 differentiator | ? | ? | ? | ? | — |
 | Rotate portrait/landscape | — | 🧭 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Scroll sync | — | 🧭 next | ✅ | ✅ | ✅ | ✅ | — |
+| Scroll sync | ✅ vertical | ✅ richer sync | ✅ | ✅ | ✅ | ✅ | — |
 | Click/input sync | — | 🧭 | ✅ | ◐ | ✅ | ◐ | — |
 | Hover/focus sync | — | 🧭 | ? | ? | ✅ | ? | — |
 | Navigation sync | ✅ common URL | ✅ configurable | ✅ | ✅ | ✅ | ✅ | — |
@@ -114,15 +114,15 @@ Legend: ✅ available, ◐ partial/basic, — not a primary capability, 🧭 pla
 | Recording | ✅ whole board V1 | 🧭 selected viewport + evidence bundle | ✅ | ? | ◐ | ✅ | — |
 | Breakpoint discovery/generation | — | 🧭 | ? | ? | ✅ | ? | ◐ |
 | Accessibility audit | — | later | ? | ? | ✅ strong | ? | ✅ |
-| Responsive overflow diagnostics | — | 🧭 Slice | ? | ? | ✅ debug tooling | ? | ◐ |
-| Deterministic responsive QA engine | — | 🧭 differentiator | ? | ? | ◐ | ? | — |
+| Responsive overflow diagnostics | ◐ engine, not desktop-integrated | ✅ | ? | ? | ✅ debug tooling | ? | ◐ |
+| Deterministic responsive QA engine | ◐ Slice/Engine in active development | ✅ differentiator | ? | ? | ◐ | ? | — |
 | Agent/automation-friendly core | ◐ emerging | 🧭 differentiator | ◐ | ? | ? | ? | ◐ |
 
 ## Competitive interpretation
 
 Polypane is the clearest current benchmark for deep synchronized interaction and responsive/accessibility debugging. Its official documentation covers synchronized navigation, scroll, hover, clicks, keyboard/form input, focus, per-pane configuration, breakpoint generation and layout/debug tooling.
 
-Sizzy, Responsively and Blisk represent mature multi-device workflows that Viewportable still needs to reach in areas such as custom devices, screenshots, rotation and synchronization.
+Sizzy, Responsively and Blisk represent mature multi-device workflows that Viewportable still needs to reach in areas such as custom devices, screenshots, rotation and richer synchronized interactions.
 
 Chrome DevTools remains the reference for low-level Chromium debugging, network/performance tooling and single-viewport device emulation.
 

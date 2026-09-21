@@ -1,6 +1,6 @@
 # Viewportable Roadmap
 
-Last updated: 2026-09-19
+Last updated: 2026-09-21
 
 The roadmap is ordered by product value and architectural leverage, not by feature count.
 
@@ -69,8 +69,11 @@ Then:
 
 ## Responsive diagnostics
 
-Integrate Slice as a separate diagnostics layer rather than coupling it to the Electron host.
+Slice is evolving into the **Viewportable Engine** in the separate `viewportable/slice` repository. Keep it as a headless diagnostics layer rather than coupling detector logic to the Electron host.
 
+The desktop application should become a consumer of stable Engine request/finding contracts. Engine research, ReDeCheck benchmarking, structural detectors and canonical finding semantics remain owned by the Engine repository.
+
+- [ ] Wire the desktop app to the stable Engine scan/finding contract.
 - [ ] Isolated-world page probe.
 - [ ] Shadow DOM overlay.
 - [ ] Overflow detection.
