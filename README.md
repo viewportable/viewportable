@@ -8,6 +8,26 @@ Viewportable renders real Chromium-backed viewports side by side and keeps logic
 - [Roadmap](docs/roadmap.md)
 - [Monetization and feature tiers](docs/features/monetization.md)
 
+## See it catch a real PR
+
+[Viewportable Engine PR #44](https://github.com/viewportable/engine/pull/44) is the public red-to-green proof for the product's deterministic PR review loop.
+
+A candidate introduced two responsive structural regressions only from **350px through 499px**. Ordinary repository CI stayed green, while Viewportable produced exact evidence, a failing `Viewportable Engine` Check Run, a retained `structural-diff.json`, and one managed PR comment.
+
+After the fix commit, the next run reported all sampled widths clean, created a successful Check Run for the new head, and updated the **same PR comment** from:
+
+```text
+❌ 2 structural regressions introduced
+```
+
+to:
+
+```text
+✅ No structural regressions introduced
+```
+
+The PR body keeps links to both the failing and successful workflow/check evidence.
+
 ## Current vertical slice
 
 - Dynamic Device Board with Phones and Tablets.
